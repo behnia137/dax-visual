@@ -1,80 +1,38 @@
-# RANKX
+# 🏆 RANKX
 
-## ELI5
+> **🧒 Explain Like I'm 5:** RANKX is a live leaderboard that re-sorts itself the moment a new score comes in — or the moment you change a filter.
 
-Think of a leaderboard at an arcade. RANKX looks at every player's score (your measure, evaluated across a table), lines them up from highest to lowest, and assigns your current player their position on that board. The ranking recalculates live as filters change — so if you filter to "just this region," the leaderboard resets for that region.
-
-## Visual — How RANKX evaluates
+## 🖼️ The Picture
 
 ```mermaid
-flowchart TD
-    A["RANKX(\n  ALL(Products),\n  [Total Sales]\n)"] --> B["Step 1: Evaluate [Total Sales]\nfor EVERY row in ALL(Products)"]
-    B --> C["Step 2: Sort results\nDescending (default)"]
-    C --> D["Step 3: Find current row's value\nin the sorted list"]
-    D --> E["Step 4: Return its position"]
-
-    style A fill:#0078d4,color:#fff
-    style E fill:#107c10,color:#fff
+flowchart LR
+    A[All Products\nwith Sales] --> B[RANKX\nrank by Sales DESC]
+    B --> C[Product A — Rank 1\nProduct B — Rank 2\nProduct C — Rank 3]
+    C --> D[Slicer changes\nto North region only]
+    D --> E[Product C — Rank 1\nProduct A — Rank 2\nProduct B — Rank 3]
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style B fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style C fill:#dcfce7,stroke:#22c55e,color:#1f2937
+    style D fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style E fill:#dcfce7,stroke:#22c55e,color:#1f2937
 ```
 
-The first argument (the table) defines **who is being ranked**. The second argument (the expression) defines **what they're ranked by**. The current filter context determines **which row you're assigning a rank to**.
+The rank updates automatically every time the filter context changes — it's not a stored value, it's a live calculation.
 
-## Pattern
+## 🔧 How it actually works
 
-```dax
--- Basic rank by total sales, highest = 1
-Product Sales Rank = 
-RANKX(
-    ALL(Products),           -- rank across all products (ignore filter context)
-    [Total Sales]            -- expression to rank by (evaluated for each product)
-)
+RANKX takes a table, an expression, and optional arguments for order, ties, and dense vs. standard ranking. It iterates through the table, evaluates the expression for each row, then determines the rank of the current row's value within that set. The "current row" is determined by the filter context — typically a product or customer in the visual's row axis.
 
--- Rank within current category (respects category filter)
-Product Rank in Category = 
-RANKX(
-    ALLSELECTED(Products[ProductName]),  -- rank within visible products
-    [Total Sales]
-)
+The first argument (the table) is crucial. If you pass `ALL(DimProduct)`, the rank is computed against all products regardless of slicers — giving you a global rank. If you pass `VALUES(DimProduct[Product])`, the rank respects the current filter context — giving you a rank within whatever is currently visible. This difference is almost always the root of RANKX bugs.
 
--- Ascending rank (lowest value = 1)
-Cost Rank = 
-RANKX(
-    ALL(Products),
-    [Average Unit Cost],
-    ,                        -- skip value argument (use expression default)
-    ASC                      -- ascending: cheapest = rank 1
-)
+Dense ranking (`RANKX(..., , , DENSE)`) means no gaps in the sequence when there are ties — 1, 2, 2, 3. Standard ranking (the default) means ties share the lower rank and the next rank skips — 1, 2, 2, 4. Know which behavior your stakeholders expect before you build.
 
--- Rank with tie-breaking
-Sales Rank Dense = 
-RANKX(
-    ALL(Products),
-    [Total Sales],
-    ,
-    DESC,
-    Dense                    -- Dense: tied items share rank, no gap after tie
-)
+## 🌍 Real-world example
 
--- Show only top 5 (blank everything else)
-Top 5 Sales Rank = 
-VAR Rank = RANKX(ALL(Products), [Total Sales])
-RETURN IF(Rank <= 5, Rank, BLANK())
-```
+A sales dashboard shows each store ranked by revenue. The report has a region slicer. The business wants rank 1 to always mean "best in the currently selected region," not "best globally." They write `Store Rank = RANKX(ALL(DimStore), [Total Sales])` initially, but the rank ignores the region slicer. Switching to `RANKX(ALLSELECTED(DimStore), [Total Sales])` makes the rank recalculate within whatever the slicer allows — rank 1 is always the top store in the selected region.
 
-## Before / After
+## 🔗 Related
 
-| Product | Total Sales | Rank (DESC, Skip) | Rank (DESC, Dense) | Rank (ASC) |
-|---------|-------------|-------------------|-------------------|------------|
-| Laptop | $120,000 | 1 | 1 | 4 |
-| Phone | $95,000 | 2 | 2 | 3 |
-| Tablet | $95,000 | 2 | 2 | 3 |
-| Keyboard | $45,000 | 4 (gap after tie) | 3 (no gap) | 2 |
-| Mouse | $30,000 | 5 | 4 | 1 |
-
-## Key rules
-
-- **The table argument controls who gets ranked** — `ALL(Products)` ranks against all products; `ALLSELECTED(Products)` ranks against only slicer-visible products
-- **The expression is evaluated for every row in the table argument, not just the current row** — RANKX iterates the whole table internally
-- **Ties use Skip (default) or Dense** — Skip leaves a gap (1,2,2,4); Dense does not (1,2,2,3); choose explicitly to avoid surprises
-- **RANKX is slow on large tables** — it evaluates the expression N times for N rows; avoid using it in visuals with thousands of rows
-- **The value argument (3rd param) is almost always omitted** — it lets you rank by a different value than the expression; leaving it blank (default) ranks by the expression's result for the current filter context
+- [🔝 TOPN](topn.md)
+- [🎯 ALLSELECTED](allselected.md)
+- [🗄️ Virtual Tables](virtual-tables.md)

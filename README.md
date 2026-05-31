@@ -1,93 +1,112 @@
-# DAX Visual Edition
+<div align="center">
 
-> DAX demystified — filter context, row context, and CALCULATE finally make sense.
+# 📊 DAX — Visual Edition
 
-Every pattern follows the same three-layer format:
-1. **ELI5 analogy** — a plain-English hook before any formula
-2. **Mermaid diagram** — how context flows through the model
-3. **Copy-paste pattern** — ready-to-use DAX with before/after table examples
+### Master DAX in minutes, not months.
+
+**Simple visuals + everyday analogies that explain DAX to everyone — whether you're a business analyst or a developer who's never opened Power BI.**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Made with Mermaid](https://img.shields.io/badge/diagrams-mermaid-ff3670.svg)](https://mermaid.js.org/)
+[![Beginner Friendly](https://img.shields.io/badge/beginner-friendly-blue.svg)](#-the-patterns)
+[![Patterns](https://img.shields.io/badge/patterns-19-blueviolet.svg)](#-the-patterns)
+[![Stars Welcome](https://img.shields.io/badge/⭐_stars-welcome-gold.svg)](#)
+
+*If this helps you finally "get" DAX — drop a ⭐. It helps more people find it.*
+
+</div>
 
 ---
 
-## The #1 Thing You Need to Understand First
+## 🤔 Why this exists
+
+DAX has millions of Power BI users — and almost all of them hit the same wall: filter context vs row context trips everyone up. Most tutorials are either cryptic function references or 50-page textbooks. This repo explains it with a diagram and one analogy.
+
+Every pattern gives you four things:
+
+- 🧒 **A plain-English analogy** — so the concept clicks before you see a single formula
+- 🖼️ **A diagram** — so the context flow is visible, not just described
+- 🔧 **How it actually works** — the mechanics, explained like a smart friend over coffee
+- 🌍 **A copy-paste example** — ready to drop into your model
+
+---
+
+## 🗺️ How DAX contexts relate
+
+The two hardest concepts in DAX — and how CALCULATE bridges them:
 
 ```mermaid
-graph LR
-    A[Filter Context] -->|comes from| B[Slicers / Rows / Columns / CALCULATE]
-    C[Row Context] -->|comes from| D[Calculated Columns / Iterators]
-    A -->|can be modified by| E[CALCULATE]
-    C -->|can be converted to filter context by| E
-    E --> F[Your Measure Result]
+flowchart LR
+    A[Filter Context] --> B[CALCULATE]
+    C[Row Context] --> B
+    B --> D[Measure Result]
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style C fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style B fill:#dcfce7,stroke:#22c55e,color:#1f2937
+    style D fill:#dcfce7,stroke:#22c55e,color:#1f2937
 ```
 
-Filter context and row context are different things. Most DAX confusion comes from mixing them up. Every pattern in this repo is labeled with which context it operates in.
+Filter context comes from slicers, row headers, and CALCULATE. Row context comes from calculated columns and iterator functions. CALCULATE is the only thing that can modify filter context — and the only thing that can convert row context into filter context. Everything else flows from there.
 
 ---
 
-## Patterns by Tier
+## 📚 The Patterns
 
-### Tier 1 — Foundations
+### 🌱 Start here — the foundations
+
 | Pattern | One-liner |
 |---------|-----------|
-| [SUM vs SUMX](patterns/sum-vs-sumx.md) | Aggregation vs iteration — the most common beginner trap |
-| [CALCULATE](patterns/calculate.md) | The most powerful function in DAX — modifies filter context |
-| [Filter Context](patterns/filter-context.md) | What filters are active when your measure evaluates |
-| [Row Context](patterns/row-context.md) | The current row when iterating through a table |
-| [RELATED](patterns/related.md) | Lookup a value from a related table |
-| [Measures vs Calculated Columns](patterns/measures-vs-calculated-columns.md) | Same syntax, completely different behavior |
-| [VAR / RETURN](patterns/variables.md) | Evaluate once, reuse everywhere — faster and debuggable |
+| [➕ SUM vs SUMX](patterns/sum-vs-sumx.md) | SUM adds up a column; SUMX loops through rows and adds up an expression |
+| [🧮 CALCULATE](patterns/calculate.md) | The one function that changes which filters are active before evaluating an expression |
+| [🔍 Filter Context](patterns/filter-context.md) | The invisible set of filters Power BI applies before your measure even starts calculating |
+| [📏 Row Context](patterns/row-context.md) | The "current row" DAX is on when it's looping through a table |
+| [🔗 RELATED](patterns/related.md) | Jump from the current row in one table to a value in a related dimension table |
+| [⚖️ Measures vs Calculated Columns](patterns/measures-vs-calculated-columns.md) | Same DAX syntax, two completely different behaviors — one stored, one live |
+| [📌 VAR / RETURN](patterns/variables.md) | Calculate something once, give it a name, use it as many times as you need |
 
-### Tier 2 — Time Intelligence
+### ⚙️ Time intelligence
+
 | Pattern | One-liner |
 |---------|-----------|
-| [TOTALYTD](patterns/totalytd.md) | Running total from the start of the year |
-| [DATEADD](patterns/dateadd.md) | Compare this period to a prior period |
-| [SAMEPERIODLASTYEAR](patterns/sameperiodlastyear.md) | Year-over-year comparison in one function |
-| [DATESBETWEEN](patterns/datesbetween.md) | Aggregate over a custom date range |
+| [📅 TOTALYTD](patterns/totalytd.md) | The running total from the first day of the year to today's date |
+| [⏩ DATEADD](patterns/dateadd.md) | Shift any date range forward or backward by days, months, quarters, or years |
+| [📆 SAMEPERIODLASTYEAR](patterns/sameperiodlastyear.md) | The fastest year-over-year comparison in DAX — one function, done |
+| [🗓️ DATESBETWEEN](patterns/datesbetween.md) | Return all dates between an explicit start and end — great for custom rolling windows |
 
-### Tier 3 — Advanced Patterns
+### 🏗️ Advanced patterns
+
 | Pattern | One-liner |
 |---------|-----------|
-| [RANKX](patterns/rankx.md) | Rank items dynamically across any dimension |
-| [TOPN](patterns/topn.md) | Return the top N rows from a table |
-| [ALLSELECTED](patterns/allselected.md) | Respect visual filters but ignore slicer context |
-| [USERELATIONSHIP](patterns/userelationship.md) | Activate an inactive relationship on the fly |
-| [Virtual Tables](patterns/virtual-tables.md) | FILTER, ADDCOLUMNS, SUMMARIZE — building tables in memory |
+| [🏆 RANKX](patterns/rankx.md) | Rank any item dynamically by any measure — updates automatically with every filter |
+| [🔝 TOPN](patterns/topn.md) | Return a virtual table containing only the top N rows by any measure |
+| [🎯 ALLSELECTED](patterns/allselected.md) | Remove slicer filters while still respecting filters set on the visual itself |
+| [🔀 USERELATIONSHIP](patterns/userelationship.md) | Temporarily activate an inactive relationship inside a single measure |
+| [🗄️ Virtual Tables](patterns/virtual-tables.md) | Tables built in memory by DAX functions — they exist during a calculation, then disappear |
 
-### Tier 4 — Context Transition & Gotchas
+### ⚠️ Gotchas — the traps
+
 | Pattern | One-liner |
 |---------|-----------|
-| [Context Transition](patterns/context-transition.md) | When CALCULATE secretly converts row context to filter context |
-| [Circular Dependencies](patterns/circular-dependencies.md) | Why your calculated column won't save |
-| [Blank vs Zero](patterns/blank-vs-zero.md) | Why blanks behave differently from zeros in DAX |
-| [Division Safety](patterns/division-safety.md) | DIVIDE vs the `/` operator — always use DIVIDE |
+| [🔄 Context Transition](patterns/context-transition.md) | The silent moment when CALCULATE converts your row context into an equivalent filter context |
+| [🔁 Circular Dependencies](patterns/circular-dependencies.md) | When a calculated column references a column that references it back — Power BI refuses to save |
+| [0️⃣ Blank vs Zero](patterns/blank-vs-zero.md) | BLANK means "no data existed." Zero means "data existed and it was zero." DAX treats them differently |
 
 ---
 
-## Quick Reference: When to Use What
+## 👯 Sister projects
 
-```mermaid
-flowchart TD
-    A{What do you need?} --> B[Aggregate a column]
-    A --> C[Aggregate with row-level math]
-    A --> D[Change what filters are active]
-    A --> E[Time comparison]
-    B --> F[SUM / COUNT / AVERAGE]
-    C --> G[SUMX / COUNTX / AVERAGEX]
-    D --> H[CALCULATE]
-    E --> I[DATEADD / SAMEPERIODLASTYEAR / TOTALYTD]
-```
+- [AI for Beginners — Visual Edition](https://github.com/behnia137/ai-for-beginners-visual) — neural networks, transformers, and LLMs explained with diagrams
+- [Power BI Data Modeling — Visual Edition](https://github.com/behnia137/power-bi-data-modeling-visual) — star schemas, relationships, and cardinality finally make sense
 
 ---
 
-## Why this repo?
+## 🤝 Contributing
 
-DAX has millions of Power BI users — and almost all of them hit the same wall: filter context vs row context. Books explain it with 50 pages of theory. This repo explains it with a diagram and one analogy.
-
-**Not too simple. Not too academic. Just visual.**
+See [CONTRIBUTING.md](CONTRIBUTING.md) — new patterns are always welcome.
 
 ---
 
-## License
+## 📄 License
 
-MIT
+[MIT](LICENSE)

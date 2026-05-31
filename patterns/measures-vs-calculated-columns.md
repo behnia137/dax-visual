@@ -1,78 +1,38 @@
-# Measures vs Calculated Columns
+# ⚖️ Measures vs Calculated Columns
 
-## ELI5
+> **🧒 Explain Like I'm 5:** A calculated column is filling in a spreadsheet column row by row and saving it forever; a measure is the formula at the bottom that recalculates fresh every time you change a filter.
 
-A **calculated column** is like filling in a new column on a spreadsheet row by row — it runs once when you save and the result is stored in the table.
-
-A **measure** is like a formula at the bottom of the spreadsheet that recalculates every time you change a filter — it has no fixed answer until there's a context to evaluate in.
-
-Same DAX syntax, completely different behavior.
-
-## Visual
+## 🖼️ The Picture
 
 ```mermaid
-flowchart LR
-    subgraph Calculated Column
-        A[Runs at refresh time] --> B[Evaluated row by row\nhas row context]
-        B --> C[Result stored in model\nconsumes RAM]
-    end
-    subgraph Measure
-        D[Runs at query time] --> E[Evaluated in filter context\nno row context by default]
-        E --> F[Result computed live\nno storage cost]
-    end
-
-    style A fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+flowchart TB
+    A[Same DAX syntax] --> B[Calculated Column]
+    A --> C[Measure]
+    B --> D[At refresh time\nRow context\nStored in RAM\nOne value per row]
+    C --> E[At query time\nFilter context\nComputed live\nOne value per cell]
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style B fill:#fef3c7,stroke:#f59e0b,color:#1f2937
     style C fill:#fef3c7,stroke:#f59e0b,color:#1f2937
-    style D fill:#dbeafe,stroke:#3b82f6,color:#1f2937
-    style F fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style D fill:#dcfce7,stroke:#22c55e,color:#1f2937
+    style E fill:#dcfce7,stroke:#22c55e,color:#1f2937
 ```
 
-## Pattern
+Same DAX, different execution environment — calculated columns live in the data model, measures live in visuals.
 
-```dax
--- CALCULATED COLUMN: Profit Margin per row (stored in table)
--- Written in the column definition, not a measure
-Profit Margin % =
-DIVIDE(Sales[Profit], Sales[Revenue])
+## 🔧 How it actually works
 
--- MEASURE: Total Profit Margin (aggregated, context-aware)
-Total Profit Margin % =
-DIVIDE(SUM(Sales[Profit]), SUM(Sales[Revenue]))
-```
+A **calculated column** is evaluated once — at refresh time — for every row in the table. It runs in row context, so it can reference columns from the same row directly. The result is stored in the VertiPaq engine as part of the model, consuming RAM. Because it's stored, a calculated column can be used as a filter or a slicer axis. The downside: it can't respond to user interactions — the value is locked in until the next refresh.
 
-## When to use which
+A **measure** is evaluated on demand — every time a visual renders, every time a slicer changes, every time the user interacts with the report. It runs in filter context, which means it automatically responds to slicers, row headers, and CALCULATE arguments. The result is never stored; it's computed fresh each time. This makes measures the right tool for any aggregation or any value that should change based on what the user is looking at.
 
-| Use case | Column or Measure? | Why |
-|----------|--------------------|-----|
-| Filter/slice by a computed value | Calculated Column | Slicers need a stored value |
-| Show an aggregated number in a visual | Measure | Needs to respond to filters |
-| Row-level classification (e.g. "High / Medium / Low") | Calculated Column | Categories stored per row |
-| Year-over-year comparison | Measure | Depends on what date is selected |
-| Use the result in a relationship | Calculated Column | Relationships need stored keys |
-| Ratio or % of total | Measure | Denominator changes with context |
+The most common mistake is putting aggregations in calculated columns. `Revenue = Sales[Quantity] * Sales[UnitPrice]` as a calculated column is fine — that's row-level math. But `Total Revenue = SUM(Sales[Amount])` as a calculated column doesn't make sense: SUM in a column produces the same grand total in every row, wasting RAM and ignoring filter context entirely.
 
-## Before / After
+## 🌍 Real-world example
 
-**Wrong approach — calculated column for a ratio:**
-```dax
--- This will ALWAYS divide one row's sales by one row's sales = always 100%
-Market Share =
-DIVIDE(Sales[Amount], SUM(Sales[Amount]))  -- SUM here is in row context, same as Sales[Amount]
-```
+A retail analyst needs two things: the profit margin for each individual product (useful as a filter — "show me only high-margin products"), and the average margin across whatever is currently selected in the report. The per-product margin is a calculated column — it's fixed per row and people want to filter by it. The average margin is a measure — it needs to respond to slicers. Same DAX operators, two completely different homes.
 
-**Correct approach — measure:**
-```dax
-Market Share =
-DIVIDE(
-    SUM(Sales[Amount]),
-    CALCULATE(SUM(Sales[Amount]), ALL(Sales))
-)
-```
+## 🔗 Related
 
-## Key rules
-
-1. **Calculated columns consume RAM** — they are materialized and compressed into the model. Use only when you genuinely need a stored value.
-2. **Measures cannot be used in slicers or relationships** — if you need to filter by a computed value, it must be a calculated column or a separate table.
-3. **SUM() inside a calculated column gives you the column total, not the row value** — this is the single most common mistake when writing column formulas.
-4. **Measures are recalculated on every render** — they are fast to write but can be slow if poorly written; optimize with VAR and avoid unnecessary iterators.
-5. **Default to measures** — only reach for a calculated column when you have a specific reason (slicing, relationship, row-level label).
+- [📏 Row Context](row-context.md)
+- [🔍 Filter Context](filter-context.md)
+- [📌 VAR / RETURN](variables.md)

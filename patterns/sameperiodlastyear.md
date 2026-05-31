@@ -1,77 +1,34 @@
-# SAMEPERIODLASTYEAR
+# 📆 SAMEPERIODLASTYEAR
 
-## ELI5
+> **🧒 Explain Like I'm 5:** You're looking at this month's numbers, then immediately seeing what those same days looked like exactly one year ago — side by side, no setup required.
 
-It's exactly what it sounds like: whatever time window you're looking at right now (a day, a month, a quarter, a year), give me the same window but exactly one year earlier. If you're looking at Q2 2024, SAMEPERIODLASTYEAR hands you Q2 2023 — same shape, twelve months back.
-
-It is a convenient shorthand for `DATEADD('Date'[Date], -1, YEAR)` — they produce identical results.
-
-## Visual — SAMEPERIODLASTYEAR mirrors the date range
+## 🖼️ The Picture
 
 ```mermaid
-flowchart TD
-    A["Report shows: Q1 2024\n(Jan 1 – Mar 31 2024)"] --> B[SAMEPERIODLASTYEAR]
-    B -->|"Returns identical range\n12 months earlier"| C["Q1 2023\n(Jan 1 – Mar 31 2023)"]
-    C --> D["Measure evaluates\nover Q1 2023 data"]
-
-    A --> E["Current measure: $310,000"]
-    D --> F["PY measure: $270,000"]
-    E & F --> G["YoY: +14.8%"]
-
-    style B fill:#0078d4,color:#fff
-    style G fill:#107c10,color:#fff
+flowchart LR
+    A[2024\nJan Feb Mar Apr] --> B[SAMEPERIODLASTYEAR]
+    B --> C[2023\nJan Feb Mar Apr]
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style B fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style C fill:#dcfce7,stroke:#22c55e,color:#1f2937
 ```
 
-## Pattern
+The same months, the same days — just shifted back exactly one year. The visual filter tells SAMEPERIODLASTYEAR what period you're looking at; it handles the shift automatically.
 
-```dax
--- Prior year sales
-Sales PY = 
-CALCULATE(
-    SUM(Sales[Amount]),
-    SAMEPERIODLASTYEAR('Date'[Date])
-)
+## 🔧 How it actually works
 
--- Year-over-year absolute change
-Sales YoY Change = 
-SUM(Sales[Amount]) - [Sales PY]
+SAMEPERIODLASTYEAR is shorthand for `DATEADD('Date'[Date], -1, YEAR)`. It takes a column of dates (always from your date table) and returns a table containing the same dates shifted back one year. When used inside CALCULATE, it replaces the current date filter with last year's equivalent period.
 
--- Year-over-year percentage change
-Sales YoY % = 
-DIVIDE(
-    SUM(Sales[Amount]) - [Sales PY],
-    [Sales PY]
-)
+Because it wraps DATEADD, SAMEPERIODLASTYEAR is smart about leap years — shifting February 29, 2024 back one year returns February 28, 2023 (since 2023 has no Feb 29), not an error. The alignment is calendar-based, not day-count-based.
 
--- Combine with TOTALYTD for YTD vs prior-year YTD
-Sales YTD = TOTALYTD(SUM(Sales[Amount]), 'Date'[Date])
+The function requires a continuous date table with no gaps. If your date table skips a day — even one — the YOY comparison can silently return blank for affected periods. This is another reason why a proper, marked date table is non-negotiable for time intelligence.
 
-Sales YTD PY = 
-CALCULATE(
-    [Sales YTD],
-    SAMEPERIODLASTYEAR('Date'[Date])
-)
+## 🌍 Real-world example
 
--- Conditional formatting helper: growth direction
-YoY Direction = 
-IF([Sales YoY %] > 0, "▲", IF([Sales YoY %] < 0, "▼", "—"))
-```
+A retail KPI card shows current month revenue alongside prior year same-month revenue. The two measures are `[Total Sales]` and `Sales SPLY = CALCULATE([Total Sales], SAMEPERIODLASTYEAR('Date'[Date]))`. When the user changes the date slicer from April to July, both cards update simultaneously — the current period moves to July 2024 and the comparison automatically moves to July 2023. No date parameter, no hardcoded year, no measure to update when the year rolls over.
 
-## Before / After
+## 🔗 Related
 
-| Period | Current Sales | Sales PY | YoY Change | YoY % |
-|--------|--------------|----------|------------|-------|
-| Jan 2024 | $100,000 | $88,000 | +$12,000 | +13.6% |
-| Feb 2024 | $105,000 | $91,000 | +$14,000 | +15.4% |
-| Mar 2024 | $105,000 | $92,000 | +$13,000 | +14.1% |
-| Q1 2024 | $310,000 | $271,000 | +$39,000 | +14.4% |
-
-> The measure works correctly at any grain — daily, monthly, quarterly, or yearly — without any modification.
-
-## Key rules
-
-- **Identical to `DATEADD('Date'[Date], -1, YEAR)`** — use whichever is more readable; SAMEPERIODLASTYEAR is preferred for clarity
-- **Requires a marked Date table** — the Date table must be continuous and marked as a Date Table in the model
-- **Works correctly at any date grain** — whether the current context is a single day, a month, or a full year, SAMEPERIODLASTYEAR shifts the entire range back 12 months
-- **Returns BLANK for dates where prior year data doesn't exist** — if your data starts January 2023, SAMEPERIODLASTYEAR for January 2023 returns BLANK (no 2022 rows); protect your YoY% with DIVIDE to avoid division-by-zero errors
-- **Fiscal years: use DATEADD with caution** — SAMEPERIODLASTYEAR always shifts by exactly 365/366 days, which may not align with custom fiscal year boundaries; test with fiscal calendar data
+- [⏩ DATEADD](dateadd.md)
+- [📅 TOTALYTD](totalytd.md)
+- [📌 VAR / RETURN](variables.md)

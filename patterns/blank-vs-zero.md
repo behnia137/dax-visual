@@ -1,91 +1,38 @@
-# Blank vs Zero
+# 0️⃣ Blank vs Zero
 
-## ELI5
+> **🧒 Explain Like I'm 5:** An empty seat (BLANK — no ticket was ever sold) looks the same as a seat with a free ticket (Zero — it was comped). Both look empty, but they mean completely different things.
 
-In most programming languages, "nothing" and "zero" mean the same thing. In DAX they are completely different. **BLANK** means "no data exists here" — like a cell that was never filled in. **Zero** means "data exists and it is zero." The difference matters because DAX treats BLANKs specially: they propagate silently, they're excluded from averages, and they can make your totals look different from what you expect.
-
-Think of it like a survey: a blank response means "didn't answer." A zero means "answered zero." A zero answer affects the average; a blank doesn't.
-
-## Visual — How BLANK propagates vs how zero behaves
+## 🖼️ The Picture
 
 ```mermaid
-flowchart TD
-    A["Product with no sales\nSales[Amount] = BLANK"] --> B["SUM(Sales[Amount])"]
-    C["Product with zero sales\nSales[Amount] = 0"] --> B
-
-    B --> D["SUM returns 0\n(BLANK is treated as 0 in SUM)"]
-
-    A --> E["AVERAGE(Sales[Amount])"]
-    C --> E
-
-    E --> F["AVERAGE ignores BLANKs\n→ only counts non-BLANK rows\n(0 IS counted)"]
-
-    A --> G["BLANK + 5 = 5\n(BLANK propagates as 0 in arithmetic)"]
-    A --> H["IF(BLANK = 0, TRUE, FALSE)\n→ TRUE (BLANK = 0 in comparisons)"]
-    A --> I["BLANK / anything = BLANK\n(not zero!)"]
-
-    style A fill:#d13438,color:#fff
-    style C fill:#107c10,color:#fff
+flowchart TB
+    A[Value in DAX] --> B[BLANK\nno data existed]
+    A --> C[Zero\ndata existed, value was 0]
+    B --> D[SUM ignores it\nAVERAGE skips it\nIF treats as FALSE\nDIVIDE returns BLANK]
+    C --> E[SUM includes it\nAVERAGE counts it\nIF treats as FALSE\nDIVIDE returns BLANK]
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style B fill:#fee2e2,stroke:#ef4444,color:#7f1d1d
+    style C fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style D fill:#fee2e2,stroke:#ef4444,color:#7f1d1d
+    style E fill:#dcfce7,stroke:#22c55e,color:#1f2937
 ```
 
-## Pattern
+BLANK and Zero look identical in most visuals — but behave differently inside DAX functions. The difference matters most in averages and conditionals.
 
-```dax
--- BLANK() function explicitly returns a blank
-No Sales Indicator = 
-IF(SUM(Sales[Amount]) = 0, BLANK(), SUM(Sales[Amount]))
--- Use to hide zero rows from visuals (BLANK rows are excluded from charts)
+## 🔧 How it actually works
 
--- Test for blank
-Has Sales = 
-IF(ISBLANK([Total Sales]), "No Data", "Has Data")
+BLANK in DAX is not zero and not null — it's its own thing. It propagates through arithmetic: `BLANK() + 5 = 5`, `BLANK() * 5 = BLANK()`, and `BLANK() = 0` evaluates to TRUE in a comparison (which is one of the most surprising behaviors in the language). This last point means that `IF(SomeColumn = 0, "zero", "nonzero")` returns "zero" for both zero values and blank values, which is often not what you want.
 
--- Return 0 instead of BLANK
-Total Sales No Blank = 
-IF(ISBLANK(SUM(Sales[Amount])), 0, SUM(Sales[Amount]))
--- Or simpler:
-Total Sales No Blank = SUM(Sales[Amount]) + 0
+AVERAGE is the most common place this distinction bites people. `AVERAGE` skips BLANK values entirely — it divides the sum by the count of non-blank rows. `AVERAGE` of {1, BLANK, 3} is 2, not 1.33. If you replace the BLANK with a 0, the average drops to 1.33. Whether that's correct depends on what the blank represents — "no sale happened" (ignore it) vs "a sale happened for zero dollars" (include it).
 
--- COALESCE: return first non-blank value (DAX 2019+)
-Safe Value = COALESCE([Total Sales], 0)
+DIVIDE deserves special mention: `DIVIDE(x, 0)` returns BLANK by default, while `x / 0` throws a division by zero error. This is why DAX best practice is always use DIVIDE for division — it handles the zero-denominator case gracefully and returns BLANK instead of crashing the visual. You can pass a third argument to DIVIDE to return a custom value instead of BLANK.
 
--- BLANK vs 0 in AVERAGE
--- Products table: Product A has $100 sales, Product B has no sales (BLANK)
-Avg With Blank = AVERAGE(Sales[Amount])  -- only averages non-blank rows
-Avg Treating Blank as Zero = 
-AVERAGEX(
-    Products,
-    IF(ISBLANK([Total Sales]), 0, [Total Sales])  -- force zeros in
-)
+## 🌍 Real-world example
 
--- BLANK in division
-Safe Division = DIVIDE([Numerator], [Denominator])
--- DIVIDE returns BLANK when denominator is 0 or BLANK (not an error)
--- 0 / 0 = BLANK (not error, not 0)
--- 5 / 0 = BLANK (not error)
+A sales dashboard shows average order value by salesperson. A salesperson who made no sales in a period has BLANK for that period — AVERAGE ignores them entirely, keeping their "average" from dragging down team numbers. A different salesperson who processed a $0 returns/refund order has Zero — that zero is counted in their average, correctly lowering it. When the business analyst first sees this, they think there's a bug. There isn't — the distinction between "no orders" and "a $0 order" is real, and DAX honors it.
 
--- Filter out blanks in a measure
-Non Blank Count = 
-COUNTROWS(
-    FILTER(Products, NOT ISBLANK([Total Sales]))
-)
-```
+## 🔗 Related
 
-## Before / After
-
-| Product | Sales Rows | `SUM` | `AVERAGE` | `COUNTROWS` | `COALESCE(..., 0)` |
-|---------|-----------|-------|-----------|-------------|-------------------|
-| Laptop | 5 rows of $100 | $500 | $100 | 5 | $500 |
-| Phone | No rows (BLANK) | BLANK | excluded | 0 | $0 |
-| Tablet | 1 row of $0 | $0 | $0 | 1 | $0 |
-| **Avg of above** | | | **$50** (only Laptop+Tablet) | | |
-
-> Phone (BLANK) is excluded from AVERAGE. Tablet ($0) is included. That's the critical difference.
-
-## Key rules
-
-- **BLANK and 0 are equal in comparisons** — `IF(BLANK() = 0, ...)` returns TRUE; use ISBLANK() to distinguish them explicitly
-- **BLANK propagates through arithmetic** — `BLANK() + 5 = 5`, but `BLANK() / 5 = BLANK()` (not 0); division by zero via DIVIDE returns BLANK, not an error
-- **AVERAGE, AVERAGEX, and statistical functions skip BLANK rows** — they are not counted in the denominator; explicitly convert BLANKs to 0 with COALESCE if you want them included
-- **Returning BLANK() from a measure hides the row/cell in Power BI visuals** — this is useful to suppress zero-value rows; returning 0 keeps them visible
-- **SUM and SUMX treat BLANK as 0** — `SUM` of a column with 3 BLANKs and 2 values of $100 returns $200, not an error
+- [⚖️ Measures vs Calculated Columns](measures-vs-calculated-columns.md)
+- [🧮 CALCULATE](calculate.md)
+- [🔍 Filter Context](filter-context.md)

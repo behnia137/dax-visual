@@ -1,44 +1,55 @@
-# CALCULATE
+# 🧮 CALCULATE
 
-## ELI5
+> **🧒 Explain Like I'm 5:** You're looking at sales through a window that only shows this year's Electronics — CALCULATE lets you swap that window for any view you want, just for the duration of one calculation.
 
-Imagine you're looking at sales numbers through a window. By default, the window shows you sales for the city your report is filtered to. CALCULATE lets you temporarily swap that window — "show me sales for the whole country, even though the report says Paris."
-
-CALCULATE doesn't change the number itself. It changes what filters are active *before* the number gets calculated.
-
-## Visual — How CALCULATE modifies filter context
+## 🖼️ The Picture
 
 ```mermaid
 flowchart LR
-    A[Report Filter\ne.g. Year = 2024] --> B[CALCULATE]
-    C[CALCULATE Filter Arguments\ne.g. ALL-Products] --> B
-    B -->|merged context| D[Inner Expression\ne.g. SUM Sales-Amount]
-    D --> E[Result]
-
-    style B fill:#0078d4,color:#fff
+    A[Existing Filter Context\ne.g. Year = 2024] --> B[CALCULATE]
+    C[New Filter Arguments\ne.g. Category = Electronics] --> B
+    B --> D[Modified Context]
+    D --> E[Inner Expression\nSUM of Sales]
+    E --> F[Result]
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style C fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style B fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style D fill:#dcfce7,stroke:#22c55e,color:#1f2937
+    style E fill:#dcfce7,stroke:#22c55e,color:#1f2937
+    style F fill:#dcfce7,stroke:#22c55e,color:#1f2937
 ```
 
-CALCULATE takes the existing filter context, applies your filter arguments (which can add, replace, or remove filters), and hands the modified context to the inner expression.
+CALCULATE merges the existing context with your filter arguments, hands the blended result to the inner expression, and returns whatever that expression produces.
 
-## Pattern
+## 🔧 How it actually works
+
+CALCULATE is the most powerful function in DAX — not because of what it calculates, but because of what it *changes*. Its first argument is any expression (usually a measure). Every argument after that is a filter. CALCULATE takes the current filter context, overlays your filters on top, and evaluates the expression inside that modified context.
+
+When you pass a condition like `Products[Category] = "Electronics"`, CALCULATE *replaces* any existing filter on that column with the new one. That's different from adding to it — if the report already filtered to Furniture and you write `CALCULATE([Sales], Products[Category] = "Electronics")`, you get Electronics, not nothing. Your filter wins. To *add* a filter without replacing, use KEEPFILTERS.
+
+CALCULATE also does something invisible and important: it triggers **context transition**. Any time CALCULATE runs inside an iterator (like SUMX or FILTER), it converts the current row context into an equivalent filter context. This is what makes measures inside iterators behave correctly — and what causes the most confusing bugs when you don't expect it.
+
+## 🌍 Real-world example
+
+You want a "% of total" measure that shows each category's share of all sales, regardless of what the user selects in a slicer. You write `Sales % of Total = DIVIDE([Total Sales], CALCULATE([Total Sales], ALL(Products[Category])))`. The `ALL(Products[Category])` strips the category filter, so the denominator always represents everything. The Year slicer still applies — ALL only removes what you tell it to remove.
 
 ```dax
--- Basic: filter a measure to a specific category
-Electronics Sales = 
+-- Override a single filter
+Electronics Sales =
 CALCULATE(
     SUM(Sales[Amount]),
     Products[Category] = "Electronics"
 )
 
--- Remove all filters on a column
-All Products Sales = 
+-- Remove a filter entirely
+All-Category Sales =
 CALCULATE(
     SUM(Sales[Amount]),
-    ALL(Products)
+    ALL(Products[Category])
 )
 
--- Combine filters
-Electronics 2024 Sales = 
+-- Stack multiple filter arguments (they are AND'd together)
+Electronics 2024 =
 CALCULATE(
     SUM(Sales[Amount]),
     Products[Category] = "Electronics",
@@ -46,17 +57,8 @@ CALCULATE(
 )
 ```
 
-## Before / After
+## 🔗 Related
 
-| Report context | Without CALCULATE | With CALCULATE + ALL(Products) |
-|----------------|-------------------|-------------------------------|
-| Category = Electronics | $120,000 | $120,000 |
-| Category = Furniture | $85,000 | $205,000 (all categories) |
-| No filter | $205,000 | $205,000 |
-
-## Key rules
-
-1. **Filter arguments are AND'd together** — each argument further narrows (or replaces) the context
-2. **CALCULATE triggers context transition** — when used inside an iterator, it converts row context to filter context
-3. **ALL() removes filters; FILTER() adds them** — know which direction you're going
-4. **Never nest CALCULATE inside CALCULATE** — the outer one wins and the inner one is redundant
+- [🔍 Filter Context](filter-context.md)
+- [🔄 Context Transition](context-transition.md)
+- [🎯 ALLSELECTED](allselected.md)

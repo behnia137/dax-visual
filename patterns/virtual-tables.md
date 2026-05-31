@@ -1,100 +1,38 @@
-# Virtual Tables
+# 🗄️ Virtual Tables
 
-## ELI5
+> **🧒 Explain Like I'm 5:** A virtual table is a whiteboard calculation you erase when you're done — you use it to get to the answer, but nothing gets stored permanently.
 
-Most DAX functions work with tables that are physically stored in the model. But sometimes you need a table that only exists for the duration of one calculation — like a scratch pad. **Virtual tables** are in-memory tables you construct on the fly using FILTER, ADDCOLUMNS, SUMMARIZE, or SUMMARIZECOLUMNS. They never get stored; they're computed, used, and thrown away.
-
-Think of them as the DAX equivalent of a SQL subquery or a temporary CTE.
-
-## Visual — Virtual table as an intermediate step
+## 🖼️ The Picture
 
 ```mermaid
-flowchart TD
-    A["Physical table: Sales\n(millions of rows)"] --> B["FILTER(\n  Sales,\n  Sales[Amount] > 1000\n)"]
-    B -->|"Virtual table:\nonly rows matching condition"| C["SUMX(\n  virtual_table,\n  Sales[Amount] * 1.1\n)"]
-    C --> D[Result]
-
-    A --> E["ADDCOLUMNS(\n  Products,\n  'Margin', [Revenue] - [Cost]\n)"]
-    E -->|"Virtual table:\nProducts + new Margin column"| F["TOPN(5, ..., [Margin], DESC)"]
-
-    style B fill:#0078d4,color:#fff
-    style E fill:#107c10,color:#fff
+flowchart LR
+    A[Source Table\nin model] --> B[FILTER / ADDCOLUMNS\n/ SUMMARIZE]
+    B --> C[Virtual Table\nin memory only]
+    C --> D[Outer expression\nuses the table]
+    D --> E[Result returned\ntable discarded]
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style B fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style C fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style D fill:#dcfce7,stroke:#22c55e,color:#1f2937
+    style E fill:#dcfce7,stroke:#22c55e,color:#1f2937
 ```
 
-## Pattern
+Virtual tables exist for the lifetime of a single DAX calculation. They're passed as arguments to other functions or used as the table argument in iterators — then they vanish.
 
-```dax
--- FILTER: subset rows from a table
-High Value Orders = 
-SUMX(
-    FILTER(Sales, Sales[Amount] > 1000),
-    Sales[Amount]
-)
+## 🔧 How it actually works
 
--- ADDCOLUMNS: extend a table with computed columns
--- Creates a virtual table with Products + a Margin column
-Weighted Margin = 
-SUMX(
-    ADDCOLUMNS(
-        Products,
-        "Margin", [Total Revenue] - [Total Cost]
-    ),
-    [Margin] * Products[Weight]
-)
+DAX functions like FILTER, ADDCOLUMNS, SUMMARIZE, CALCULATETABLE, CROSSJOIN, UNION, and TOPN all return tables, not scalars. These table-valued functions are the building blocks of complex DAX patterns. The tables they return aren't stored anywhere — they live in memory during the evaluation of the outer expression and are discarded when it finishes.
 
--- SUMMARIZE: group-by aggregation (returns a table)
--- Best used for grouping; avoid adding aggregation columns to SUMMARIZE
-Category Summary = 
-SUMMARIZE(
-    Sales,
-    Products[Category],          -- group by Category
-    'Date'[Year]                 -- group by Year
-)
+FILTER is the most common: it takes an existing table and a condition, and returns the subset of rows that match. ADDCOLUMNS takes a table and adds one or more new calculated columns to it, useful for pre-computing values before aggregating. SUMMARIZE groups a table by one or more columns and optionally adds summary columns — it's like a SQL GROUP BY.
 
--- SUMMARIZECOLUMNS: preferred for grouped aggregations
--- (more efficient than SUMMARIZE + ADDCOLUMNS for measures)
-Revenue by Category = 
-SUMMARIZECOLUMNS(
-    Products[Category],
-    "Total Revenue", SUM(Sales[Amount]),
-    "Order Count", COUNTROWS(Sales)
-)
+Virtual tables are especially powerful as the first argument to SUMX or CALCULATE. `SUMX(FILTER(FactSales, FactSales[Discount] > 0.2), FactSales[Amount])` iterates only over rows with a discount greater than 20% — the FILTER virtual table acts as a row filter for the iterator. This avoids modifying the base table and keeps the logic self-contained.
 
--- Combine ADDCOLUMNS + FILTER for a filtered ranked table
-Top Margin Products = 
-FILTER(
-    ADDCOLUMNS(
-        Products,
-        "ProductMargin", [Total Revenue] - [Total Cost]
-    ),
-    [ProductMargin] > 5000
-)
+## 🌍 Real-world example
 
--- VAR pattern: assign a virtual table to a variable for reuse
-Complex Calculation = 
-VAR SummaryTable = 
-    ADDCOLUMNS(
-        SUMMARIZE(Sales, Products[Category]),
-        "CategorySales", [Total Sales],
-        "CategoryRank", RANKX(ALL(Products[Category]), [Total Sales])
-    )
-VAR TopCategories = FILTER(SummaryTable, [CategoryRank] <= 3)
-RETURN SUMX(TopCategories, [CategorySales])
-```
+A finance team wants to calculate the revenue from orders where the gross margin exceeds 30%. There's no "high-margin order" flag in the fact table, so they build the filter dynamically: `High Margin Revenue = SUMX(FILTER(FactSales, DIVIDE(FactSales[Profit], FactSales[Revenue]) > 0.3), FactSales[Revenue])`. FILTER creates a virtual table of only the qualifying rows, SUMX iterates it and sums the revenue. The virtual table is never saved to the model — it's built fresh on every query, always reflecting the latest data and the current filter context.
 
-## Before / After
+## 🔗 Related
 
-| Function | Input | Output |
-|----------|-------|--------|
-| `FILTER(Sales, Amount > 1000)` | 1,000 rows | ~200 rows matching condition |
-| `ADDCOLUMNS(Products, "Margin", ...)` | Products (50 cols) | Products (51 cols, new Margin column) |
-| `SUMMARIZE(Sales, Category)` | Sales (1M rows) | Distinct categories (10 rows) |
-| `TOPN(3, virtual_table, [Margin], DESC)` | 10-row virtual table | 3-row virtual table |
-
-## Key rules
-
-- **Prefer ADDCOLUMNS + SUMMARIZE over adding measure columns directly to SUMMARIZE** — `SUMMARIZE(table, col, "name", expression)` is deprecated-style and can produce incorrect results with measures; use `ADDCOLUMNS(SUMMARIZE(...), "name", expression)` instead
-- **SUMMARIZECOLUMNS is the modern, preferred alternative to SUMMARIZE for reporting aggregations** — it handles blank filtering and is more query-optimizer-friendly
-- **Virtual tables are evaluated in the current filter context** — FILTER inside a measure sees the same slicers the measure does; use ALL() in the table argument if you need to escape context
-- **Assign complex virtual tables to VAR** — this avoids recomputing the same table multiple times and makes formulas readable
-- **Large virtual tables are expensive** — iterating millions of rows with FILTER or ADDCOLUMNS can be slow; consider whether a pre-computed calculated table or a model-level relationship achieves the same result more efficiently
+- [➕ SUM vs SUMX](sum-vs-sumx.md)
+- [🔝 TOPN](topn.md)
+- [🧮 CALCULATE](calculate.md)

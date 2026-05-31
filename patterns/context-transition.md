@@ -1,85 +1,40 @@
-# Context Transition
+# 🔄 Context Transition
 
-## ELI5
+> **🧒 Explain Like I'm 5:** You're reading a row on a conveyor belt (row context). The moment you call CALCULATE, someone takes a photo of that row and pins it to the wall as a filter — now you're in filter mode instead of row mode.
 
-Context transition is DAX's most surprising behavior. Normally, measures and calculated columns live in completely separate worlds. But when you call **CALCULATE inside an iterator** (like SUMX or FILTER), something magic — and dangerous — happens: the current **row context** is silently converted into an equivalent **filter context** before the expression inside CALCULATE runs.
-
-It's like the iterator row says "I am Product ID 101" and CALCULATE translates that into a filter: "only show data where Product ID = 101." Useful when you want it. Catastrophic when you don't.
-
-## Visual — Context transition in action
+## 🖼️ The Picture
 
 ```mermaid
-flowchart TD
-    A["SUMX iterates Customers table\nRow context: CustomerID = 42"] --> B["CALCULATE(\n  SUM(Sales[Amount])\n) inside SUMX"]
-    B -->|"Context Transition:\nrow context → filter context"| C["Filter: CustomerID = 42\napplied to entire data model"]
-    C --> D["SUM(Sales[Amount])\nnow returns sales for Customer 42 only"]
-    D --> E["Each customer gets their own sales total\nSUMX accumulates them"]
-
-    A2["SUMX iterates Customers\nRow context: CustomerID = 42"] --> B2["SUM(Sales[Amount])\nwithout CALCULATE"]
-    B2 -->|"No context transition"| C2["SUM ignores row context\nreturns same grand total\nfor every customer row!"]
-
-    style B fill:#0078d4,color:#fff
-    style B2 fill:#d13438,color:#fff
+flowchart LR
+    A[Iterator\nSUMX, FILTER...] --> B[Row Context\ncurrent row active]
+    B --> C[CALCULATE\ninside the iterator]
+    C --> D[Context Transition\nrow → filter context]
+    D --> E[Measure evaluates\nin filter context]
+    E --> F[Result for this row]
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style B fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style C fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style D fill:#fee2e2,stroke:#ef4444,color:#7f1d1d
+    style E fill:#dcfce7,stroke:#22c55e,color:#1f2937
+    style F fill:#dcfce7,stroke:#22c55e,color:#1f2937
 ```
 
-## Pattern
+Context transition is automatic and invisible — it happens any time CALCULATE (or any measure, which implicitly wraps itself in CALCULATE) is called inside row context.
 
-```dax
--- WRONG: SUM inside SUMX without CALCULATE — ignores row context
--- Returns grand total × number of rows (massively inflated)
-WRONG Total = 
-SUMX(
-    Customers,
-    SUM(Sales[Amount])    -- SUM doesn't see row context!
-)
+## 🔧 How it actually works
 
--- CORRECT: reference the column directly in the iterator
-Correct Total = 
-SUMX(
-    Sales,
-    Sales[Amount]         -- direct column reference uses row context correctly
-)
+When CALCULATE runs inside a row context — typically inside an iterator like SUMX or FILTER — it does something extra before evaluating its inner expression. It takes every column value from the current row and converts them into an equivalent set of filter context constraints. If the current row has `ProductKey = 42`, context transition adds a filter `DimProduct[ProductKey] = 42` to the filter context. The row context is then replaced by this derived filter context.
 
--- Context transition: CALCULATE inside SUMX triggers it
--- This correctly computes each customer's sales using their own filter
-Customer Weighted Score = 
-SUMX(
-    Customers,
-    CALCULATE(SUM(Sales[Amount])) * Customers[PriorityWeight]
-    -- CALCULATE triggers context transition:
-    -- each iteration filters Sales to the current customer
-)
+This matters because measures are always evaluated in filter context, never in row context. When you call a measure inside SUMX — even without CALCULATE explicitly — the measure is wrapped in an implicit CALCULATE, which triggers context transition. This is why measures called from iterators "know" which row they're on: context transition converted the row into a filter.
 
--- Calling a measure inside an iterator triggers context transition implicitly
--- (measures always have an implicit CALCULATE wrapper)
-Sum of Measure = 
-SUMX(
-    Customers,
-    [Total Sales]   -- [Total Sales] = SUM(Sales[Amount])
-                    -- calling a measure here triggers context transition!
-)
+The gotcha: context transition can produce unexpected results when the current row's key column is not unique. If two rows have the same key value, context transition creates a filter that matches both rows — your measure evaluates over two rows instead of one. This is the most common source of "my SUMX returns double the expected value" bugs.
 
--- Calculated column: context transition when calling a measure
--- This calculated column on the Customers table works correctly:
-Customers[TotalSales] = [Total Sales]
--- Equivalent to:
-Customers[TotalSales] = CALCULATE(SUM(Sales[Amount]))
--- Because calling a measure in a calculated column triggers context transition
-```
+## 🌍 Real-world example
 
-## Before / After
+A developer writes a calculated column `Sales Rank = RANKX(ALL(FactSales), [Total Sales])`. They expect each row's rank based on that row's sales amount. But `[Total Sales]` is a measure — calling it inside RANKX's iterator triggers context transition. For each row in the iterator, DAX converts the row's key values into a filter context, then evaluates `[Total Sales]` against that filtered context. The rank is computed correctly because context transition makes the measure "see" only that row's data. Without context transition, the measure would return the same grand total for every row.
 
-| Scenario | Code | CustomerID 42 Sales | Behavior |
-|----------|------|---------------------|----------|
-| Direct reference | `SUMX(Sales, Sales[Amount])` | N/A | Correct aggregation |
-| SUM without CALCULATE | `SUMX(Customers, SUM(Sales[Amount]))` | $2,450,000 (grand total) | Wrong — repeats grand total |
-| Measure call (implicit CT) | `SUMX(Customers, [Total Sales])` | $8,400 | Correct — CT activates |
-| Explicit CALCULATE | `SUMX(Customers, CALCULATE(SUM(Sales[Amount])))` | $8,400 | Correct — CT explicit |
+## 🔗 Related
 
-## Key rules
-
-- **Calling any measure inside an iterator triggers context transition** — measures have an implicit CALCULATE wrapper; this is intentional behavior
-- **SUM, COUNT, and other aggregation functions do NOT trigger context transition** — only CALCULATE (explicit or implicit via measure call) does
-- **Context transition can cause performance problems** — it forces a full filter context re-evaluation for every row in the iterator; on large tables this is expensive
-- **Calculated column that calls a measure works via context transition** — `Column = [MyMeasure]` on a Customers table correctly returns each customer's measure value because the row context transitions to a filter
-- **Unintentional context transition is a common silent bug** — if a measure returns the same value for every row in an iterator, check whether you're missing CALCULATE or calling an aggregation that ignores row context
+- [📏 Row Context](row-context.md)
+- [🔍 Filter Context](filter-context.md)
+- [🧮 CALCULATE](calculate.md)

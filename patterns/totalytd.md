@@ -1,83 +1,42 @@
-# TOTALYTD
+# 📅 TOTALYTD
 
-## ELI5
+> **🧒 Explain Like I'm 5:** Think of a savings account balance that resets to zero on January 1st and just keeps adding up all year — that's what TOTALYTD does to your sales.
 
-Think of a odometer on a car — it doesn't reset every time you stop; it keeps accumulating from January 1st. **TOTALYTD** is your DAX odometer: it gives you the running total of a measure from the first day of the year up to whatever date is currently in context.
-
-Every time the date moves forward, TOTALYTD automatically expands the date window back to January 1st and re-aggregates.
-
-## Visual — How TOTALYTD expands the date range
+## 🖼️ The Picture
 
 ```mermaid
 flowchart LR
-    A["Current filter context:\nMonth = March 2024"] --> B[TOTALYTD]
-    B -->|"Expands date filter to\nJan 1 2024 → Mar 31 2024"| C["SUM(Sales[Amount])\nover Jan–Mar 2024"]
-    C --> D[YTD Result: $310,000]
-
-    subgraph "Without TOTALYTD"
-        E["March only: $105,000"]
-    end
-
-    style B fill:#0078d4,color:#fff
+    A[Jan] --> B[Feb] --> C[Mar] --> D[Apr] --> E[May] --> F[Jun]
+    A --> G[TOTALYTD\nJan 1 → Jan 31]
+    B --> H[TOTALYTD\nJan 1 → Feb 28]
+    C --> I[TOTALYTD\nJan 1 → Mar 31]
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style B fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style C fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style D fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style E fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style F fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style G fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style H fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style I fill:#dcfce7,stroke:#22c55e,color:#1f2937
 ```
 
-TOTALYTD replaces the date filter in context with a range from the start of the fiscal/calendar year to the last date in context.
+Each month, TOTALYTD expands its date window back to January 1st. The window grows with every passing month; it never shrinks until the year rolls over.
 
-## Pattern
+## 🔧 How it actually works
 
-```dax
--- Basic: calendar year (resets Jan 1)
-Sales YTD = 
-TOTALYTD(
-    SUM(Sales[Amount]),
-    'Date'[Date]
-)
+TOTALYTD is a shortcut for `CALCULATE([measure], DATESYTD('Date'[Date]))`. Under the hood, DATESYTD generates a table of every date from January 1st of the current year up to the last date in the current filter context. TOTALYTD then feeds that date table as a filter to CALCULATE, which replaces the existing date filter with the expanded YTD range.
 
--- Fiscal year ending June 30 (year resets July 1)
-Sales YTD Fiscal = 
-TOTALYTD(
-    SUM(Sales[Amount]),
-    'Date'[Date],
-    "06-30"            -- year-end date in MM-DD format
-)
+The third argument to TOTALYTD is an optional fiscal year-end date string — `"6/30"` for a June fiscal year-end, for example. When you provide it, TOTALYTD resets its window at the start of your fiscal year instead of January 1st. This is one of the few time intelligence functions with built-in fiscal year support.
 
--- Equivalent long form using CALCULATE + DATESYTD
-Sales YTD Manual = 
-CALCULATE(
-    SUM(Sales[Amount]),
-    DATESYTD('Date'[Date])
-)
+TOTALYTD requires a proper date table marked as a date table in your model. Without it, the date arithmetic that generates the rolling window won't work. The date table must also be continuous — no gaps — for the result to be accurate.
 
--- Fiscal year long form
-Sales YTD Fiscal Manual = 
-CALCULATE(
-    SUM(Sales[Amount]),
-    DATESYTD('Date'[Date], "06-30")
-)
+## 🌍 Real-world example
 
--- YTD vs prior year YTD comparison
-Sales YTD PY = 
-CALCULATE(
-    [Sales YTD],
-    DATEADD('Date'[Date], -1, YEAR)
-)
-```
+A retail chain publishes monthly reports showing both monthly revenue and year-to-date revenue side by side. The monthly revenue is `[Total Sales]` — straightforward. The YTD column uses `Sales YTD = TOTALYTD([Total Sales], 'Date'[Date])`. In January it shows January's total. In March it shows January + February + March. In December it shows the full year. No CALCULATE, no DATEADD, no date table slicing by hand — one function handles all of it.
 
-## Before / After
+## 🔗 Related
 
-| Month | Monthly Sales | Sales YTD | Sales YTD (Prior Year) |
-|-------|--------------|-----------|------------------------|
-| Jan 2024 | $100,000 | $100,000 | $88,000 |
-| Feb 2024 | $105,000 | $205,000 | $179,000 |
-| Mar 2024 | $105,000 | $310,000 | $270,000 |
-| Apr 2024 | $98,000 | $408,000 | $355,000 |
-
-> YTD always grows monotonically within a year. If it dips, your Date table likely has gaps.
-
-## Key rules
-
-- **Requires a marked Date table** — the Date column must be part of a table marked as a Date Table in Power BI, or the function will error
-- **The Date table must be contiguous (no gaps)** — missing dates cause TOTALYTD to under-count
-- **The year-end date parameter is the *last* day of your fiscal year**, not the first day of the new year — e.g., June fiscal year end = `"06-30"`, not `"07-01"`
-- **TOTALYTD is syntactic sugar for CALCULATE + DATESYTD** — if you need more control (e.g., custom filters), use the long form
-- **Avoid using TOTALYTD in row-level security contexts** — the date expansion can leak data across security boundaries; test explicitly
+- [⏩ DATEADD](dateadd.md)
+- [📆 SAMEPERIODLASTYEAR](sameperiodlastyear.md)
+- [🗓️ DATESBETWEEN](datesbetween.md)

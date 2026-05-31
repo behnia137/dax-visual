@@ -1,64 +1,47 @@
-# VAR / RETURN (Variables)
+# 📌 VAR / RETURN
 
-## ELI5
+> **🧒 Explain Like I'm 5:** Instead of recalculating your gross income four times in a tax return, you write it on a sticky note at the top and just reference the sticky note each time you need it.
 
-Imagine you're doing a tax return and you need to calculate your gross income four times in different formulas. Instead of recalculating it each time, you write it on a sticky note at the top and just reference the note each time.
-
-VAR is that sticky note. You calculate something once, give it a name, and reuse it. DAX only evaluates it once — so it's faster, shorter, and far easier to debug.
-
-## Visual
+## 🖼️ The Picture
 
 ```mermaid
-flowchart TD
-    A[Measure is called] --> B[VAR TotalSales =\nSUM Sales-Amount]
-    B --> C[VAR PY_Sales =\nCALCULATE SUM...\nSAMEPERIODLASTYEAR]
-    C --> D[RETURN\nDIVIDE TotalSales - PY_Sales\nPY_Sales]
-    D --> E[Result returned to visual]
-
+flowchart TB
+    A[Measure starts] --> B[VAR SalesAmt\nevaluated once\nstored in memory]
+    A --> C[VAR PriorAmt\nevaluated once\nstored in memory]
+    B --> D[RETURN\ncombines both VARs]
+    C --> D
+    D --> E[Final result]
     style A fill:#dbeafe,stroke:#3b82f6,color:#1f2937
-    style D fill:#0078d4,color:#fff
+    style B fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style C fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style D fill:#dcfce7,stroke:#22c55e,color:#1f2937
     style E fill:#dcfce7,stroke:#22c55e,color:#1f2937
 ```
 
-## Pattern
+Each VAR is computed exactly once. RETURN combines them into the final answer. No repeated evaluation, no risk of inconsistency.
+
+## 🔧 How it actually works
+
+VAR declares a named value that is evaluated once at the point where it's declared. You can reference that variable anywhere later in the same measure — in RETURN or inside another VAR. This eliminates redundant calculations and makes complex measures dramatically more readable.
+
+The scoping rule: a variable captures the filter context at the moment it's declared. This has an important implication — if you declare a VAR inside an iterator like SUMX, it captures the row's context. If you declare it at the top of the measure before any iteration, it captures the outer filter context. Be deliberate about where you place each VAR.
+
+RETURN is the last thing in a VAR block and is mandatory. It's the expression whose result becomes the measure's output. You can reference any previously declared variable in the RETURN expression. Variables are also a debugging lifesaver: you can temporarily replace the RETURN with a single variable name to inspect that intermediate value in the visual.
+
+## 🌍 Real-world example
+
+A year-over-year growth measure without VAR is a mess — you have to write the same `CALCULATE([Sales], SAMEPERIODLASTYEAR('Date'[Date]))` expression twice (once in the numerator logic, once in a denominator check). With VAR, you calculate it once, name it `PriorYear`, and reference it in both places. The measure is half the length and impossible to have inconsistent between the two references.
 
 ```dax
--- Without VAR — hard to read, evaluates SUM twice
-YoY % Change =
-DIVIDE(
-    SUM(Sales[Amount]) - CALCULATE(SUM(Sales[Amount]), SAMEPERIODLASTYEAR('Date'[Date])),
-    CALCULATE(SUM(Sales[Amount]), SAMEPERIODLASTYEAR('Date'[Date]))
-)
-
--- With VAR — evaluated once, readable, debuggable
-YoY % Change =
-VAR CurrentSales = SUM(Sales[Amount])
-VAR PriorYearSales =
-    CALCULATE(
-        SUM(Sales[Amount]),
-        SAMEPERIODLASTYEAR('Date'[Date])
-    )
+YoY Growth % =
+VAR CurrentSales = [Total Sales]
+VAR PriorSales   = CALCULATE([Total Sales], SAMEPERIODLASTYEAR('Date'[Date]))
 RETURN
-    DIVIDE(CurrentSales - PriorYearSales, PriorYearSales)
+    DIVIDE(CurrentSales - PriorSales, PriorSales)
 ```
 
-## Debugging with VAR
+## 🔗 Related
 
-```dax
--- Replace RETURN value with any VAR to inspect intermediate results
-YoY % Change =
-VAR CurrentSales = SUM(Sales[Amount])
-VAR PriorYearSales =
-    CALCULATE(SUM(Sales[Amount]), SAMEPERIODLASTYEAR('Date'[Date]))
-VAR Difference = CurrentSales - PriorYearSales
-RETURN
-    PriorYearSales  -- swap this to any VAR to see its value in the visual
-```
-
-## Key rules
-
-1. **VARs are evaluated in the filter context at the point of definition** — not at the RETURN line. If you define a VAR outside of CALCULATE, it does not inherit filters added later.
-2. **VARs cannot reference each other out of order** — a VAR can reference an earlier VAR but not a later one.
-3. **VARs are not re-evaluated on each row** — they evaluate once, which makes them faster than repeating an expression inside an iterator.
-4. **RETURN must be the last line** — everything after VAR declarations and before RETURN is a variable definition, not an expression.
-5. **Always use VAR for expressions used more than once** — double evaluation is wasted compute and invites bugs if you edit one copy but forget the other.
+- [🧮 CALCULATE](calculate.md)
+- [📅 TOTALYTD](totalytd.md)
+- [📆 SAMEPERIODLASTYEAR](sameperiodlastyear.md)

@@ -1,76 +1,36 @@
-# ALLSELECTED
+# 🎯 ALLSELECTED
 
-## ELI5
+> **🧒 Explain Like I'm 5:** It's a percentage-of-total that uses only the products currently visible in your table — not all products ever, but also not filtered down further by the visual itself.
 
-Imagine a bar chart filtered by a slicer to show only 3 out of 10 product categories. You want the percentage bars to add up to 100% *within those 3 categories*, not across all 10. ALLSELECTED gives you the total for "whatever the user has selected in the slicer" — it ignores the row/column header context but still honors the outer slicer.
-
-It sits between ALL (ignores everything) and no function (respects everything).
-
-## Visual — ALLSELECTED vs ALL vs no function
+## 🖼️ The Picture
 
 ```mermaid
-flowchart TD
-    A["Slicer: Category IN\n{Electronics, Furniture}"] --> D
-    B["Visual row: Category = Electronics"] --> D
-    D["Measure evaluates"]
-
-    D --> E["SUM(Sales[Amount])\n→ Electronics sales only\n(respects both slicer AND row)"]
-    D --> F["CALCULATE(..., ALL(Products))\n→ ALL categories total\n(ignores both)"]
-    D --> G["CALCULATE(..., ALLSELECTED(Products[Category]))\n→ Electronics + Furniture total\n(ignores row, respects slicer)"]
-
-    style G fill:#0078d4,color:#fff
-    style F fill:#d13438,color:#fff
-    style E fill:#107c10,color:#fff
+flowchart TB
+    A[Slicer: Category = Electronics] --> B[ALL\nignores slicer entirely\ngrand total of everything]
+    A --> C[ALLSELECTED\nrespects slicer\ntotal of Electronics only]
+    A --> D[No modifier\nrespects slicer AND visual\nfiltered subset]
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style B fill:#fee2e2,stroke:#ef4444,color:#7f1d1d
+    style C fill:#dcfce7,stroke:#22c55e,color:#1f2937
+    style D fill:#fef3c7,stroke:#f59e0b,color:#1f2937
 ```
 
-## Pattern
+ALLSELECTED sits between ALL (removes everything) and no modifier (keeps everything). It removes filters applied by the visual itself while preserving filters from slicers and external sources.
 
-```dax
--- % of total that respects slicer but not visual row context
-Sales % of Slicer Total = 
-DIVIDE(
-    SUM(Sales[Amount]),
-    CALCULATE(SUM(Sales[Amount]), ALLSELECTED(Products[Category]))
-)
+## 🔧 How it actually works
 
--- % of total that ignores everything (benchmark against all data)
-Sales % of Grand Total = 
-DIVIDE(
-    SUM(Sales[Amount]),
-    CALCULATE(SUM(Sales[Amount]), ALL(Products))
-)
+ALLSELECTED returns all values of a column (or all rows of a table) that were visible *before* the visual applied its own filters. In practice, this means: slicer selections are preserved, but row-level filters within the visual are removed. This makes it perfect for "percentage of subtotal" measures — you want the denominator to be "all the products currently showing in the visual," not the entire product catalog.
 
--- Share within selected customers
-Customer Share = 
-DIVIDE(
-    [Total Sales],
-    CALCULATE([Total Sales], ALLSELECTED(Customers[CustomerName]))
-)
+The mental model: imagine a report with a category slicer set to "Electronics" and a table showing individual products. If you use `ALL(DimProduct)`, the denominator includes every product in the entire model — the percentage denominators will be tiny because Electronics is a small fraction of everything. If you use `ALLSELECTED(DimProduct)`, the denominator is just the Electronics products — so percentages add up to 100% within the visible set. That's almost always what users expect.
 
--- ALLSELECTED on full table vs single column
--- Full table: removes all visual-level filters on the table
-Sales % (All Dims) = 
-DIVIDE(
-    SUM(Sales[Amount]),
-    CALCULATE(SUM(Sales[Amount]), ALLSELECTED())  -- no argument = all filters
-)
-```
+ALLSELECTED's behavior is technically defined as "restore the filter context that existed at the start of the most recent SUMMARIZECOLUMNS call" — which is a mouthful. The practical implication: it respects what the user selected in slicers and cross-filters from other visuals, but ignores the row-by-row breakdown in the current visual. It is not a simple "remove visual filters" function, so test it carefully with complex filter interactions.
 
-## Before / After
+## 🌍 Real-world example
 
-| Slicer | Row | `SUM` | `ALL(Category)` | `ALLSELECTED(Category)` |
-|--------|-----|-------|-----------------|------------------------|
-| Elec + Furn | Electronics | $120k | $450k (all 10) | $205k (2 selected) |
-| Elec + Furn | Furniture | $85k | $450k | $205k |
-| Elec + Furn | Total | $205k | $450k | $205k |
-| All categories | Electronics | $120k | $450k | $450k (all = selected) |
+A product performance table shows individual products with a "% of category total" column. The user has a slicer that filters to just the Electronics category. With `CALCULATE([Total Sales], ALL(DimProduct[Product]))`, the denominator is all-time total sales — useless for showing share within Electronics. With `CALCULATE([Total Sales], ALLSELECTED(DimProduct[Product]))`, the denominator is just the Electronics products currently in the visual, so the percentages add up to 100% and make intuitive sense to the reader.
 
-> When no slicer is active, ALLSELECTED behaves exactly like ALL.
+## 🔗 Related
 
-## Key rules
-
-- **ALLSELECTED respects outer query filters (slicers) but removes the current visual's row/column filters** — this is its key difference from ALL
-- **Use ALLSELECTED for "% of visible total" scenarios** — so your percentages sum to 100% within the user's current selection
-- **ALLSELECTED() with no argument removes all visual-level filters** — passing a specific column removes only that column's visual context
-- **ALLSELECTED can produce unexpected results with complex filter interactions** — test with multiple overlapping slicers and cross-filters before deploying
-- **ALLSELECTED shadows the shadow filter context** — it is implemented using DAX's shadow filter mechanism and can behave unexpectedly inside deeply nested CALCULATE calls; prefer it at the outermost measure level
+- [🧮 CALCULATE](calculate.md)
+- [🔍 Filter Context](filter-context.md)
+- [🏆 RANKX](rankx.md)

@@ -1,76 +1,42 @@
-# Filter Context
+# 🔍 Filter Context
 
-## ELI5
+> **🧒 Explain Like I'm 5:** Imagine you're calculating sales, but someone already put on glasses that only let you see rows from 2024 in the North region — that invisible pair of glasses is filter context.
 
-Think of a coffee shop with a big chalkboard showing total sales. When a customer points to "just espresso drinks" on the menu board, the number on the chalkboard changes to show only espresso sales. The customer's finger is the **filter context** — it silently constrains every number on that board without you having to write different formulas.
-
-Filter context is the set of active filters (from slicers, row/column headers, and CALCULATE) that are in effect when a measure evaluates. Your measure doesn't choose its filter context — the report hands it one.
-
-## Visual — Where filter context comes from
+## 🖼️ The Picture
 
 ```mermaid
-flowchart TD
-    A[Slicer: Year = 2024] --> F[Filter Context]
-    B[Row header: Category = Electronics] --> F
-    C[Column header: Region = West] --> F
-    D[CALCULATE filter arguments] --> F
-    F -->|applied to data model| G[Measure evaluates\nover filtered rows only]
-    G --> H[Single result value]
-
-    style F fill:#0078d4,color:#fff
-    style G fill:#107c10,color:#fff
+flowchart TB
+    A[Slicer\nYear = 2024] --> E[Active Filter Context]
+    B[Row header\nCategory = Electronics] --> E
+    C[Column header\nRegion = North] --> E
+    D[CALCULATE\nfilter arguments] --> E
+    E --> F[Measure evaluates\nover filtered rows only]
+    F --> G[Single result value]
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style B fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style C fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style D fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style E fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style F fill:#dcfce7,stroke:#22c55e,color:#1f2937
+    style G fill:#dcfce7,stroke:#22c55e,color:#1f2937
 ```
 
-Every cell in a Power BI visual has its own filter context. A table with 3 categories × 4 years = 12 cells = 12 separate measure evaluations, each with a different filter context.
+Every cell in a Power BI visual has its own filter context — a table with 3 categories × 4 years = 12 cells = 12 separate measure evaluations.
 
-## Pattern
+## 🔧 How it actually works
 
-```dax
--- A measure automatically respects filter context — no extra code needed
-Total Sales = SUM(Sales[Amount])
--- This single formula returns $120k for Electronics, $85k for Furniture,
--- $205k for the grand total — all from the same DAX
+Filter context is the set of filters that are in effect when a measure starts calculating. It comes from four places: slicers on the report page, row and column headers in a matrix or table visual, page-level and report-level filters in the filter pane, and CALCULATE filter arguments in the measure itself. All of these are AND'd together — each one further narrows the visible rows.
 
--- CALCULATE lets you override or extend filter context
-Electronics Sales = 
-CALCULATE(
-    SUM(Sales[Amount]),
-    Products[Category] = "Electronics"   -- adds/replaces a filter
-)
+Your measure doesn't choose its filter context. The report hands it one silently, before your first line of DAX ever runs. When you write `Total Sales = SUM(Sales[Amount])`, that single formula returns $120k for Electronics, $85k for Furniture, and $205k for the grand total — all from the same expression, because the filter context changes for each cell.
 
--- ALL() removes filter context for a column — useful for % of total
-Sales % of Total = 
-DIVIDE(
-    SUM(Sales[Amount]),
-    CALCULATE(SUM(Sales[Amount]), ALL(Products[Category]))
-)
+The only function that can *modify* filter context is CALCULATE. Everything else reads it but cannot change it. This is why CALCULATE is so central to DAX — it's the only door into a different filter context.
 
--- ALLSELECTED() respects slicer filters but ignores visual filters
-Sales % of Visual Total = 
-DIVIDE(
-    SUM(Sales[Amount]),
-    CALCULATE(SUM(Sales[Amount]), ALLSELECTED(Products[Category]))
-)
+## 🌍 Real-world example
 
--- Check what's in filter context programmatically
-Current Category = SELECTEDVALUE(Products[Category], "Multiple")
-```
+A sales manager has a matrix visual with product categories on rows and years on columns. Every cell calls the same `[Total Sales]` measure. The cell at Electronics / 2023 has filter context `{Category = "Electronics", Year = 2023}`. The cell at Furniture / 2024 has `{Category = "Furniture", Year = 2024}`. Power BI evaluates the same formula 12 times, each time with a different filter context automatically applied from the visual structure.
 
-## Before / After
+## 🔗 Related
 
-| Slicer: Year | Row: Category | `SUM(Sales[Amount])` | `CALCULATE(..., ALL(Products[Category]))` |
-|-------------|--------------|---------------------|------------------------------------------|
-| 2024 | Electronics | $120,000 | $205,000 |
-| 2024 | Furniture | $85,000 | $205,000 |
-| 2024 | (All) | $205,000 | $205,000 |
-| 2023 | Electronics | $98,000 | $173,000 |
-
-> The Year slicer is still respected by `ALL(Products[Category])` because ALL only removes the Category filter, not the Year filter.
-
-## Key rules
-
-- **Filter context is additive** — each slicer, row, and column header ANDs its filter on top of the others
-- **Measures always evaluate inside filter context** — you cannot "turn off" filter context; you can only modify it with CALCULATE
-- **Calculated columns have no filter context** — they run during refresh with no active report filters; use row context instead
-- **CALCULATE is the only function that can modify filter context** — every other function reads it but cannot change it
-- **A blank filter context (grand total row) means all rows are visible** — ALL filters are removed, not that a special "total" filter is applied
+- [🧮 CALCULATE](calculate.md)
+- [📏 Row Context](row-context.md)
+- [🔄 Context Transition](context-transition.md)

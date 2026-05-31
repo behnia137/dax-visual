@@ -1,93 +1,45 @@
-# Row Context
+# 📏 Row Context
 
-## ELI5
+> **🧒 Explain Like I'm 5:** Picture a conveyor belt moving boxes past you one at a time — row context is whichever box is directly in front of you right now.
 
-Picture a spreadsheet where you're filling in a formula in column C. While you're on row 5, you automatically know what's in columns A and B of **row 5** — that's row context. The formula engine is sitting on a specific row and all column values for that row are visible.
-
-Row context exists during two things: **calculated column formulas** (where you're defining a value for every row) and **iterator functions** like SUMX, FILTER, MAXX — where the engine walks the table one row at a time.
-
-## Visual — Row context vs filter context
+## 🖼️ The Picture
 
 ```mermaid
-flowchart TD
-    subgraph "Calculated Column (row context)"
-        A["Table: Sales"] --> B["For row 1: Qty=2, Price=$10"]
-        B --> C["Profit = Sales[Revenue] - Sales[Cost]"]
-        C --> D["Row 1 result: $4"]
-        D --> E["Stored in the column for row 1"]
-    end
-
-    subgraph "SUMX iterator (row context)"
-        F["Sales table"] --> G["Row context moves row by row"]
-        G --> H["Expression: Sales[Qty] × Sales[Price]"]
-        H --> I["Each row result accumulated"]
-        I --> J["Final aggregate returned"]
-    end
-
-    style C fill:#0078d4,color:#fff
-    style H fill:#107c10,color:#fff
+flowchart LR
+    A[Full Table\nall rows] --> B[Iterator\nSUMX / FILTER / etc.]
+    B --> C[Row 1\ncurrent row context]
+    B --> D[Row 2\ncurrent row context]
+    B --> E[Row 3\ncurrent row context]
+    C --> F[Expression evaluated\non this row]
+    D --> F
+    E --> F
+    F --> G[Accumulated Result]
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style B fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style C fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style D fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style E fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style F fill:#dcfce7,stroke:#22c55e,color:#1f2937
+    style G fill:#dcfce7,stroke:#22c55e,color:#1f2937
 ```
 
-Row context gives you access to every column in the **current row** of the table being iterated. It does NOT automatically filter other tables — that's what RELATED and CALCULATE are for.
+Row context moves through the table one row at a time. While it's on a row, any column reference resolves to that row's value.
 
-## Pattern
+## 🔧 How it actually works
 
-```dax
--- Calculated column: row context is automatic
--- (This formula goes in the Sales table as a new column)
-Profit = Sales[Revenue] - Sales[Cost]
+Row context exists in two places: inside **calculated columns** (where DAX processes each row of the table once at refresh time), and inside **iterator functions** like SUMX, FILTER, ADDCOLUMNS, and MAXX (where DAX loops through each row during query time).
 
--- Row context in SUMX
-Total Margin = 
-SUMX(
-    Sales,
-    Sales[Revenue] - Sales[Cost]   -- row context: each row's Revenue and Cost
-)
+When you're in row context and you reference `Sales[Quantity]`, DAX knows you mean the Quantity value of the current row — not all quantities, not a sum. That's the key difference from filter context: filter context determines which rows are visible, while row context tells you which specific row you're currently on.
 
--- Nested iterators: inner iterator has its own row context
--- (outer row context is shadowed by the inner one for the same table)
-Weighted Score = 
-SUMX(
-    Students,
-    SUMX(
-        Grades,                            -- inner iterator on Grades table
-        Grades[Score] * Grades[Weight]     -- inner row context: current Grades row
-    )
-)
+Row context does *not* automatically cross relationships. If you're in a calculated column on `FactSales` and want a value from `DimProduct`, you can't just write `DimProduct[Category]` — you need `RELATED(DimProduct[Category])` to follow the relationship. Row context stays on the current table; RELATED is the bridge to related tables.
 
--- Row context does NOT filter related tables automatically
--- Use RELATED to pull values from the one-side of a relationship
-Category Margin = 
-SUMX(
-    Sales,
-    Sales[Revenue] - RELATED(Products[StandardCost])
-    --              ^^^^^^^ needed because row context doesn't cross relationships
-)
+## 🌍 Real-world example
 
--- CALCULATE inside an iterator converts row context to filter context
-Has High Sales = 
-SUMX(
-    Customers,
-    IF(
-        CALCULATE(SUM(Sales[Amount])) > 10000,  -- CALCULATE triggers context transition
-        1, 0
-    )
-)
-```
+You add a calculated column to `FactSales` called `Revenue = Sales[Quantity] * Sales[UnitPrice]`. When Power BI processes this at refresh, it creates row context for each row in the table. On row 1, `Sales[Quantity]` resolves to that row's quantity and `Sales[UnitPrice]` resolves to that row's unit price — the multiplication gives you the revenue for that specific sale. The same column formula runs independently for every row, which is exactly what you want.
 
-## Before / After
+## 🔗 Related
 
-| Row | Revenue | Cost | `Profit` calculated column | Contribution to `SUMX` margin |
-|-----|---------|------|--------------------------|-------------------------------|
-| 1   | $100    | $60  | $40                      | $40                           |
-| 2   | $200    | $140 | $60                      | $60                           |
-| 3   | $150    | $90  | $60                      | $60                           |
-| **Total** | | | (stored per row) | **$160** |
-
-## Key rules
-
-- **Row context exists during calculated columns and iterators** — not in regular measures evaluated by the report
-- **Row context does not filter related tables** — use RELATED (many-to-one) or RELATEDTABLE (one-to-many) to cross relationships
-- **Nested iterators shadow outer row context** on the same table — the inner loop's row context replaces the outer one for that table
-- **CALCULATE inside an iterator converts row context to filter context** — this is called context transition and is often unintentional (see [context-transition.md](context-transition.md))
-- **Calculated columns run at refresh time with no active filter context** — they cannot reference slicers or report filters
+- [🔍 Filter Context](filter-context.md)
+- [➕ SUM vs SUMX](sum-vs-sumx.md)
+- [🔄 Context Transition](context-transition.md)
+- [🔗 RELATED](related.md)

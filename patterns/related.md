@@ -1,77 +1,36 @@
-# RELATED
+# 🔗 RELATED
 
-## ELI5
+> **🧒 Explain Like I'm 5:** You're looking at a sales row and want to know the product's category — RELATED crosses the bridge to the product table and brings back the answer.
 
-Imagine your Sales spreadsheet has a Product ID column but not the Product Name. The Product Names live in a separate Products table. **RELATED** is the lookup that walks over to the Products table, finds the matching row by ID, and hands you back the Product Name — all while you're sitting on a row in Sales.
-
-RELATED only works when there is a relationship defined between the two tables, and you're asking from the **many side** (Sales) to get something from the **one side** (Products).
-
-## Visual — How RELATED crosses a relationship
+## 🖼️ The Picture
 
 ```mermaid
 flowchart LR
-    subgraph "Sales (many side)"
-        A["Row context:\nSales[ProductID] = 101"]
-    end
-
-    subgraph "Products (one side)"
-        B["ProductID = 101\nProductName = 'Laptop'\nCategory = 'Electronics'"]
-    end
-
-    A -- "RELATED(Products[Category])\nfollows the relationship" --> B
-    B -- "returns 'Electronics'" --> C[Expression result]
-
-    style A fill:#0078d4,color:#fff
-    style B fill:#107c10,color:#fff
+    A[FactSales\ncurrent row] --> B[RELATED]
+    B --> C[DimProduct\nmatching row via relationship]
+    C --> D[Returns\nCategory value]
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style B fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style C fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style D fill:#dcfce7,stroke:#22c55e,color:#1f2937
 ```
 
-The relationship acts as a bridge. RELATED follows the bridge, finds the single matching row on the one-side, and returns the requested column value.
+RELATED follows the relationship from the many-side table to the one-side table and returns the value from whatever column you ask for.
 
-## Pattern
+## 🔧 How it actually works
 
-```dax
--- Calculated column: pull category name from Products into Sales
-Sales[Category] = RELATED(Products[Category])
+RELATED only works when you're in a row context — inside a calculated column or an iterator function. It follows an existing relationship from the current table to a related table and returns a single value. Because the relationship is many-to-one (from fact to dimension), there's always exactly one matching row on the other side, so RELATED always returns a scalar.
 
--- Calculated column: pull standard cost for margin calculation
-Sales[StandardCost] = RELATED(Products[StandardCost])
+You can chain RELATED across multiple hops if your model has a chain of relationships: `RELATED(DimSubcategory[CategoryName])` might cross from FactSales → DimProduct → DimSubcategory in one step, as long as all the relationships exist and point in the right direction. Power BI resolves the full path automatically.
 
--- Use RELATED inside SUMX for row-level lookups
-Gross Profit = 
-SUMX(
-    Sales,
-    Sales[Revenue] - RELATED(Products[StandardCost])
-)
+RELATED doesn't work from a dimension table looking toward a fact table — that's the "many" side, where there could be multiple matching rows. For that direction, use RELATEDTABLE, which returns all the matching rows as a table rather than a single value.
 
--- RELATED inside FILTER
-High Margin Sales = 
-CALCULATE(
-    SUM(Sales[Revenue]),
-    FILTER(
-        Sales,
-        Sales[Revenue] - RELATED(Products[StandardCost]) > 100
-    )
-)
+## 🌍 Real-world example
 
--- RELATEDTABLE: the reverse direction (one-to-many)
--- Use from the one-side to get a table of related rows from the many-side
-Products[TotalSales] = SUMX(RELATEDTABLE(Sales), Sales[Revenue])
-```
+You want a calculated column on `FactSales` that stores the product category for each sale, so you can slice by category without a relationship. You write `SaleCategory = RELATED(DimProduct[Category])`. As DAX processes each row of `FactSales`, it looks up the `ProductKey` for that row, finds the matching row in `DimProduct`, and returns that product's `Category`. The result is a new column on the fact table that contains the category string for every sale.
 
-## Before / After
+## 🔗 Related
 
-| Sales Row | ProductID | Revenue | `RELATED(Products[Category])` | `RELATED(Products[StandardCost])` |
-|-----------|-----------|---------|-------------------------------|-----------------------------------|
-| 1         | 101       | $1,200  | Electronics                   | $750                              |
-| 2         | 205       | $450    | Furniture                     | $200                              |
-| 3         | 101       | $800    | Electronics                   | $750                              |
-
-> Without RELATED, you'd have to add the Category column to the Sales table manually — duplicating data and causing sync issues.
-
-## Key rules
-
-- **RELATED requires an active relationship** — if the relationship doesn't exist or is inactive, RELATED returns BLANK; use USERELATIONSHIP inside CALCULATE to activate inactive ones
-- **RELATED only travels many-to-one** — from the fact table to a dimension; use RELATEDTABLE for the reverse direction
-- **RELATED requires row context** — it only works inside calculated columns or iterator functions (SUMX, FILTER, etc.), not in standalone measures
-- **RELATED follows the entire relationship chain** — if Sales → Products → Category is a chain, `RELATED(Category[Name])` works from Sales directly
-- **Avoid storing RELATED results as calculated columns when not needed** — using RELATED inside SUMX is more memory-efficient than materializing the column
+- [📏 Row Context](row-context.md)
+- [➕ SUM vs SUMX](sum-vs-sumx.md)
+- [🔀 USERELATIONSHIP](userelationship.md)

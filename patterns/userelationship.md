@@ -1,76 +1,37 @@
-# USERELATIONSHIP
+# 🔀 USERELATIONSHIP
 
-## ELI5
+> **🧒 Explain Like I'm 5:** You have three doors (relationships) between two tables, but only one can be open at a time — USERELATIONSHIP lets you open a different door just for the duration of one calculation.
 
-In Power BI you can have more than one relationship between two tables, but only one can be "on" at a time — the others are inactive (shown as dotted lines in the model view). USERELATIONSHIP is a light switch: inside a specific CALCULATE, it flips on an inactive relationship while temporarily turning off the active one.
-
-The classic example is a Date table connected to a Sales table via both OrderDate and ShipDate — one is active, one is dormant. USERELATIONSHIP lets you measure sales by ShipDate without duplicating your Date table.
-
-## Visual — Switching between active and inactive relationships
+## 🖼️ The Picture
 
 ```mermaid
-flowchart LR
-    subgraph "Data Model"
-        D["Date Table\n'Date'[Date]"]
-        S["Sales Table"]
-        D -- "Active (solid)\nSales[OrderDate]" --> S
-        D -. "Inactive (dotted)\nSales[ShipDate]" .-> S
-    end
-
-    subgraph "Measure using USERELATIONSHIP"
-        C["CALCULATE(\n  SUM(Sales[Amount]),\n  USERELATIONSHIP(\n    Sales[ShipDate],\n    'Date'[Date]\n  )\n)"]
-        C -->|"Activates ShipDate path\nDeactivates OrderDate path"| R["Result filtered\nby ShipDate"]
-    end
-
-    style C fill:#0078d4,color:#fff
-    style R fill:#107c10,color:#fff
+flowchart TB
+    A[DimDate] -->|OrderDate\nactive| B[FactSales]
+    A -->|ShipDate\ninactive dashed| B
+    A -->|DueDate\ninactive dashed| B
+    C[USERELATIONSHIP\nShipDate] --> D[Measure evaluates\nvia ShipDate relationship]
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style B fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style C fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style D fill:#dcfce7,stroke:#22c55e,color:#1f2937
 ```
 
-## Pattern
+The active OrderDate relationship is the default for every other measure. USERELATIONSHIP temporarily swaps it to ShipDate for just this one measure — and switches back automatically when the measure finishes.
 
-```dax
--- Sales measured by ShipDate instead of OrderDate
-Sales by Ship Date = 
-CALCULATE(
-    SUM(Sales[Amount]),
-    USERELATIONSHIP(Sales[ShipDate], 'Date'[Date])
-)
+## 🔧 How it actually works
 
--- Sales measured by DueDate
-Sales by Due Date = 
-CALCULATE(
-    SUM(Sales[Amount]),
-    USERELATIONSHIP(Sales[DueDate], 'Date'[Date])
-)
+A Power BI model can have multiple relationships between the same two tables, but only one can be active at a time. Active means "used automatically when filters flow between the tables." Inactive relationships exist in the model but are ignored unless you explicitly activate them with USERELATIONSHIP.
 
--- USERELATIONSHIP combined with other filters
-Shipped Electronics 2024 = 
-CALCULATE(
-    SUM(Sales[Amount]),
-    USERELATIONSHIP(Sales[ShipDate], 'Date'[Date]),
-    Products[Category] = "Electronics",
-    'Date'[Year] = 2024
-)
+USERELATIONSHIP must appear inside a CALCULATE call — it's a modifier that changes how CALCULATE routes filters. You pass the two columns that define the relationship you want to activate (in the same format as the relationship itself: `USERELATIONSHIP(FactSales[ShipDate], 'Date'[Date])`). For the duration of that CALCULATE, filters on the date table flow through the ShipDate column instead of OrderDate. When CALCULATE finishes, the default relationship resumes.
 
--- Role-playing dimension: two Date tables (alternative approach)
--- Some models use separate "Order Date" and "Ship Date" dimension tables
--- to avoid needing USERELATIONSHIP entirely
-```
+The most common use case is role-playing dimensions — one date table with multiple relationships to the same fact table (OrderDate, ShipDate, DueDate). Each role gets its own measure using USERELATIONSHIP to route through the correct column.
 
-## Before / After
+## 🌍 Real-world example
 
-| Month (Date slicer) | Sales (by OrderDate, default) | Sales by ShipDate (`USERELATIONSHIP`) |
-|--------------------|-------------------------------|---------------------------------------|
-| Jan 2024 | $100,000 | $87,000 |
-| Feb 2024 | $105,000 | $112,000 |
-| Mar 2024 | $105,000 | $108,000 |
+A logistics team needs two measures on the same report: "Revenue by Order Date" (the default — uses the active relationship automatically) and "Revenue by Ship Date" (uses USERELATIONSHIP). They write `Sales by Ship Date = CALCULATE([Total Sales], USERELATIONSHIP(FactSales[ShipDateKey], 'Date'[DateKey]))`. Both measures use the same DimDate slicer. When the user selects March, "Revenue by Order Date" shows orders placed in March, while "Revenue by Ship Date" shows orders that shipped in March — regardless of when they were placed.
 
-> The difference occurs because orders placed in March may ship in April, and orders shipped in February were placed in January.
+## 🔗 Related
 
-## Key rules
-
-- **USERELATIONSHIP only works inside CALCULATE** — it is a modifier function; calling it outside CALCULATE does nothing
-- **The relationship must already exist in the model (even if inactive)** — you cannot create a relationship on the fly with USERELATIONSHIP
-- **The active relationship on the same column pair is automatically deactivated** — you don't need to explicitly turn off the active one; DAX handles it
-- **Both columns in the USERELATIONSHIP call must be the join keys** — pass the exact columns used in the relationship definition, not any other columns
-- **Consider role-playing dimension tables as an alternative** — creating separate dimension tables (OrderDate dim, ShipDate dim) avoids USERELATIONSHIP entirely and often performs better in large models
+- [🔗 RELATED](related.md)
+- [🧮 CALCULATE](calculate.md)
+- [🗄️ Virtual Tables](virtual-tables.md)

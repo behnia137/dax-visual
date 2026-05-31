@@ -1,77 +1,41 @@
-# SUM vs SUMX
+# ➕ SUM vs SUMX
 
-## ELI5
+> **🧒 Explain Like I'm 5:** SUM adds up the "Total" column already printed on a receipt; SUMX goes item by item, works out a custom price for each one, and then adds those up.
 
-Imagine you have a receipt from a grocery store. **SUM** is like adding up the "Total" column that's already printed on the receipt. **SUMX** is like going row by row, calculating a custom price for each item (say, applying a special discount), and *then* adding those results up.
-
-SUM aggregates a column that already exists. SUMX iterates every row, computes something, and then aggregates those computed values.
-
-## Visual — How SUM and SUMX differ in execution
+## 🖼️ The Picture
 
 ```mermaid
-flowchart TD
-    subgraph SUM
-        A[Sales Table] --> B["SUM(Sales[Amount])\nDirectly aggregate the Amount column"]
-        B --> C[Result: $12,000]
-    end
-
-    subgraph SUMX
-        D[Sales Table] --> E["For each row in Sales..."]
-        E --> F["Compute: Sales[Qty] × Sales[UnitPrice]"]
-        F --> G["Accumulate each row result"]
-        G --> H[Result: $12,350]
-    end
-
-    style B fill:#0078d4,color:#fff
-    style F fill:#107c10,color:#fff
+flowchart LR
+    A[Sales Table] --> B[SUM\ndirect aggregation]
+    A --> C[SUMX\niterate each row]
+    C --> D[row expression\nQty × Price]
+    D --> E[aggregate results]
+    B --> F[Result]
+    E --> F
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1f2937
+    style B fill:#dcfce7,stroke:#22c55e,color:#1f2937
+    style C fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style D fill:#fef3c7,stroke:#f59e0b,color:#1f2937
+    style E fill:#dcfce7,stroke:#22c55e,color:#1f2937
+    style F fill:#dcfce7,stroke:#22c55e,color:#1f2937
 ```
 
-SUM reads one column. SUMX walks the table row by row and evaluates any expression — it has **row context** during each iteration.
+SUM takes a single stored column and adds it up in one pass. SUMX walks every row, evaluates an expression, and accumulates the results.
 
-## Pattern
+## 🔧 How it actually works
 
-```dax
--- SUM: aggregate a pre-existing column
-Total Sales = SUM(Sales[Amount])
+SUM is the simpler of the two — it reaches into a column, adds every value together, and hands back a number. There's no looping, no per-row logic. If the answer you want already lives in a column, SUM is the right tool.
 
--- SUMX: compute per-row then aggregate
--- Use when the value you want doesn't exist as a stored column
-Revenue = 
-SUMX(
-    Sales,                            -- table to iterate
-    Sales[Quantity] * Sales[UnitPrice] -- expression evaluated on each row
-)
+SUMX is an *iterator*. It takes a table and an expression. For each row in the table it evaluates the expression in that row's context, stores the result, then moves to the next row. When it's done looping it adds all the stored results together. That per-row context is called **row context**, and it's what makes SUMX so flexible — you can multiply columns, call RELATED, apply conditionals, anything.
 
--- SUMX with a related table lookup
-Revenue with Discount = 
-SUMX(
-    Sales,
-    Sales[Quantity] * RELATED(Products[ListPrice]) * (1 - Sales[DiscountPct])
-)
+The practical rule: if the column already exists, use SUM. If you need to compute something row by row before summing, use SUMX. Using SUMX where SUM would do is not wrong, just slower — SUMX has iteration overhead.
 
--- SUMX over a virtual table (advanced)
-Top Customer Revenue = 
-SUMX(
-    TOPN(10, Customers, [Total Sales], DESC),
-    [Total Sales]
-)
-```
+## 🌍 Real-world example
 
-## Before / After
+Your `FactSales` table has `Quantity` and `UnitPrice` columns but no pre-computed `Revenue` column. You can't SUM revenue because it doesn't exist as a stored value. Instead you write `Revenue = SUMX(FactSales, FactSales[Quantity] * FactSales[UnitPrice])`. DAX loops through every sales row, multiplies quantity by unit price on that row, and accumulates the total. If prices later change in the product table, a `SUMX` with `RELATED(DimProduct[ListPrice])` will always pick up the current price — no stale stored column.
 
-| Qty | Unit Price | Stored Amount | SUM(Amount) | SUMX(Qty × Price) |
-|-----|-----------|--------------|-------------|-------------------|
-| 2   | $10       | $20          | —           | $20               |
-| 5   | $8        | $30 (stale)  | —           | $40               |
-| 1   | $15       | $15          | —           | $15               |
-| **Total** | | | **$65 (stale)** | **$75 (accurate)** |
+## 🔗 Related
 
-> Note: when the stored Amount column hasn't been refreshed after a price change, SUM gives a wrong answer. SUMX always recomputes.
-
-## Key rules
-
-- **Use SUM when the column already contains the final value** — it is faster and simpler
-- **Use SUMX when the value requires row-level computation** — multiplication, conditional logic, or lookups via RELATED
-- **SUMX establishes row context** — inside the expression argument you can reference any column of the iterated table directly
-- **SUMX over large tables is slower** — avoid iterating millions of rows when a calculated column + SUM would serve the same purpose
-- **Never use SUM inside SUMX's expression** — SUM ignores row context; use the column reference directly (e.g., `Sales[Amount]`, not `SUM(Sales[Amount])`)
+- [📏 Row Context](row-context.md)
+- [🔗 RELATED](related.md)
+- [⚖️ Measures vs Calculated Columns](measures-vs-calculated-columns.md)

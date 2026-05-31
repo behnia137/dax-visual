@@ -1,87 +1,33 @@
-# Circular Dependencies
+# 🔁 Circular Dependencies
 
-## ELI5
+> **🧒 Explain Like I'm 5:** "When does the meeting start?" — "When the other meeting ends." — "When does that one end?" — "When the first meeting starts." Nobody can leave — and Power BI feels the same way.
 
-A circular dependency is like two students who each say "I'll copy my answer from you" — neither ever writes anything down, and the teacher gets nothing. In DAX, it happens when a calculated column or table tries to use a value that itself depends on the first column to exist. The engine can't figure out which one to compute first, so it throws an error.
-
-## Visual — How a circular dependency forms
+## 🖼️ The Picture
 
 ```mermaid
 flowchart LR
-    A["Products[AdjustedPrice]\n= Products[BasePrice] × [PriceFactor]"] -->|"depends on"| B["[PriceFactor] measure\n= AVERAGE(Products[AdjustedPrice])"]
-    B -->|"depends on"| A
-
-    C["ERROR:\nCircular dependency detected"] 
-
-    A & B --> C
-
-    style A fill:#d13438,color:#fff
-    style B fill:#d13438,color:#fff
-    style C fill:#333,color:#fff
+    A[Calculated Column A\nreferences Column B] --> B[Calculated Column B\nreferences Column A]
+    B --> A
+    style A fill:#fee2e2,stroke:#ef4444,color:#7f1d1d
+    style B fill:#fee2e2,stroke:#ef4444,color:#7f1d1d
 ```
 
-Circular dependencies most commonly occur between calculated columns and measures that reference those columns, or between two calculated columns that reference each other.
+Power BI detects the loop before saving — the model refuses to publish with a circular dependency. You'll see an error, not wrong results.
 
-## Pattern
+## 🔧 How it actually works
 
-```dax
--- CAUSES circular dependency:
--- Calculated column references a measure that aggregates the same column
-Products[AdjustedPrice] = Products[BasePrice] * [AvgPriceFactor]
--- Where [AvgPriceFactor] = AVERAGE(Products[AdjustedPrice])  ← circular!
+A circular dependency occurs when a calculated column (or calculated table) references another calculated column that — directly or through a chain — references the first one back. DAX can't resolve this because it has no starting point: to compute A, it needs B, but to compute B, it needs A. Power BI detects these cycles during model validation and blocks the save entirely.
 
--- -------------------------------------------------------
--- FIX 1: Replace the measure with a direct column reference
-Products[AdjustedPrice] = 
-Products[BasePrice] * Products[PriceFactorCol]  -- use stored column, not measure
+The most common cause is two calculated columns that both try to reference each other's values, or a chain of three or more columns that forms a loop. Circular dependencies can also appear between calculated tables — Table A defined using Table B, and Table B defined using Table A. The error message in Power BI Desktop usually names the columns involved, which helps you trace the cycle.
 
--- -------------------------------------------------------
--- FIX 2: Break the chain by computing intermediate values differently
--- Compute the factor at measure time, not column time
-Adjusted Revenue = 
-SUMX(
-    Products,
-    Products[BasePrice] * [AvgPriceFactorFromOtherTable]
-)
+Measures are immune to circular dependencies in the traditional sense because they don't store their values — they're computed on demand. You can have a measure that references another measure that references it back without a build error, though you'd get an infinite evaluation loop at query time, which DAX will catch and return blank for. In practice, genuinely circular measure logic is rare; the error you actually care about is the calculated column version that blocks model deployment.
 
--- -------------------------------------------------------
--- Common circular dependency: two columns referencing each other
--- BAD:
-Sales[GrossMargin] = Sales[Revenue] - Sales[Cost]  -- fine
-Sales[MarginPct] = Sales[GrossMargin] / Sales[Revenue]  -- fine
+## 🌍 Real-world example
 
--- BAD circular version:
-Sales[Revenue] = Sales[Quantity] * RELATED(Products[Price]) + Sales[Bonus]
-Sales[Bonus] = Sales[Revenue] * 0.05   -- ← circular! Bonus depends on Revenue
-                                        --   Revenue depends on Bonus
+A developer creates two calculated columns on `FactSales`: `AdjustedPrice = FactSales[BasePrice] * FactSales[Multiplier]` and `Multiplier = IF(FactSales[AdjustedPrice] > 100, 1.1, 1.0)`. This looks logical in isolation — Multiplier depends on whether AdjustedPrice exceeds a threshold, and AdjustedPrice uses Multiplier. But Power BI immediately flags a circular dependency: computing AdjustedPrice requires Multiplier, and computing Multiplier requires AdjustedPrice. The fix is to remove the dependency: precompute Multiplier from a base column that doesn't reference AdjustedPrice, or move the logic into a measure evaluated at query time.
 
--- FIX: compute Bonus from a base price, not from Revenue
-Sales[Bonus] = Sales[Quantity] * RELATED(Products[Price]) * 0.05
-Sales[Revenue] = Sales[Quantity] * RELATED(Products[Price]) * 1.05
+## 🔗 Related
 
--- -------------------------------------------------------
--- Calculated TABLE circular dependency
--- BAD:
-ProductSummary = SUMMARIZE(Sales, Products[Category], "AvgPrice", AVERAGE(Products[AdjustedPrice]))
--- If AdjustedPrice depends on a measure that reads ProductSummary → circular
-
--- FIX: base calculated tables only on physical columns, not derived measures
-ProductSummary = SUMMARIZE(Sales, Products[Category], "AvgPrice", AVERAGE(Products[BasePrice]))
-```
-
-## Before / After
-
-| Situation | What DAX does | Fix |
-|-----------|--------------|-----|
-| Column A → Measure → Column A | Circular dependency error, column won't save | Break the loop: make the measure use a different source column |
-| Column A → Column B → Column A | Circular dependency error | Reorder logic so one column is computed from physical columns only |
-| Measure → Measure → Measure | No error (measures are lazy-evaluated at query time) | Not a problem; measures can reference each other freely |
-| Calculated Table → Measure → Calculated Table | Circular dependency error | Base calculated tables on physical tables/columns only |
-
-## Key rules
-
-- **Measures can reference each other freely** — circular dependencies only affect calculated columns and calculated tables, which must be computed at refresh time in a fixed order
-- **The root cause is always a refresh-time ordering problem** — DAX needs to know "compute X before Y," but a cycle makes that impossible
-- **Trace the dependency chain** — when you get the error, follow each reference until you find where the loop closes; the Power BI error message usually names both columns involved
-- **Calculated tables that depend on measures are high-risk** — if the measure eventually reads a column from that calculated table, you have a cycle; prefer basing calculated tables on raw physical columns
-- **Moving logic from a calculated column into a measure breaks the cycle** — measures are query-time constructs; they don't need a refresh-time order and thus can't create circular dependencies with each other
+- [⚖️ Measures vs Calculated Columns](measures-vs-calculated-columns.md)
+- [📏 Row Context](row-context.md)
+- [🗄️ Virtual Tables](virtual-tables.md)
