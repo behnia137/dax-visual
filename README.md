@@ -13,6 +13,14 @@
 [![Patterns](https://img.shields.io/badge/patterns-19-blueviolet.svg)](#-the-patterns)
 [![Stars Welcome](https://img.shields.io/badge/⭐_stars-welcome-gold.svg)](#)
 
+[![dax](https://img.shields.io/badge/dax-1f6feb?style=flat)](https://github.com/topics/dax)
+[![power-bi](https://img.shields.io/badge/power--bi-1f6feb?style=flat)](https://github.com/topics/power-bi)
+[![data-analysis](https://img.shields.io/badge/data--analysis-1f6feb?style=flat)](https://github.com/topics/data-analysis)
+[![business-intelligence](https://img.shields.io/badge/business--intelligence-1f6feb?style=flat)](https://github.com/topics/business-intelligence)
+[![beginner-friendly](https://img.shields.io/badge/beginner--friendly-1f6feb?style=flat)](https://github.com/topics/beginner-friendly)
+[![learning-resources](https://img.shields.io/badge/learning--resources-1f6feb?style=flat)](https://github.com/topics/learning-resources)
+[![awesome](https://img.shields.io/badge/awesome-1f6feb?style=flat)](https://github.com/topics/awesome)
+
 *If this helps you finally "get" DAX, drop a ⭐. It helps more people find it.*
 
 </div>
