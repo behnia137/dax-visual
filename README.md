@@ -1,6 +1,6 @@
 <div align="center">
 
-# 📊 DAX: Visual Edition
+# 📊 DAX Visual Edition
 
 ### Master DAX in minutes, not months.
 
