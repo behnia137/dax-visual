@@ -63,12 +63,9 @@ All diagrams must use the Tailwind color palette defined in the README. No custo
 
 These patterns don't have files yet: pick one and go:
 
-- `SWITCH`: the readable alternative to nested IF
 - `IF`: conditional logic and how it interacts with BLANK
 - `COALESCE`: return the first non-blank value from a list
 - `EARLIER`: referencing an outer row context from inside a nested iterator
-- `KEEPFILTERS`: add a filter without replacing the existing one
-- `SELECTEDVALUE`: return a single selected value or a default
 - `ISINSCOPE`: detect which level of a hierarchy is visible
 - `HASONEVALUE`: check whether a column has exactly one value in context
 - `CROSSJOIN`: combine two tables into every possible row pairing

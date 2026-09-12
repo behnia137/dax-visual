@@ -10,7 +10,7 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![Made with Mermaid](https://img.shields.io/badge/diagrams-mermaid-ff3670.svg)](https://mermaid.js.org/)
 [![Beginner Friendly](https://img.shields.io/badge/beginner-friendly-blue.svg)](#-the-patterns)
-[![Patterns](https://img.shields.io/badge/patterns-19-blueviolet.svg)](#-the-patterns)
+[![Patterns](https://img.shields.io/badge/patterns-22-blueviolet.svg)](#-the-patterns)
 [![Stars Welcome](https://img.shields.io/badge/⭐_stars-welcome-gold.svg)](#)
 
 [![dax](https://img.shields.io/badge/dax-1f6feb?style=flat)](https://github.com/topics/dax)
@@ -72,6 +72,8 @@ Filter context comes from slicers, row headers, and CALCULATE. Row context comes
 | [🔗 RELATED](patterns/related.md) | Jump from the current row in one table to a value in a related dimension table |
 | [⚖️ Measures vs Calculated Columns](patterns/measures-vs-calculated-columns.md) | Same DAX syntax, two completely different behaviors: one stored, one live |
 | [📌 VAR / RETURN](patterns/variables.md) | Calculate something once, give it a name, use it as many times as you need |
+| [🚦 SWITCH](patterns/switch.md) | A flat, readable list of conditions that replaces deeply nested IF statements |
+| [🎛️ SELECTEDVALUE](patterns/selectedvalue.md) | Return the single value in context, or a fallback when zero or many are selected |
 
 ### ⚙️ Time intelligence
 
@@ -91,6 +93,7 @@ Filter context comes from slicers, row headers, and CALCULATE. Row context comes
 | [🎯 ALLSELECTED](patterns/allselected.md) | Remove slicer filters while still respecting filters set on the visual itself |
 | [🔀 USERELATIONSHIP](patterns/userelationship.md) | Temporarily activate an inactive relationship inside a single measure |
 | [🗄️ Virtual Tables](patterns/virtual-tables.md) | Tables built in memory by DAX functions: they exist during a calculation, then disappear |
+| [🧲 KEEPFILTERS](patterns/keepfilters.md) | Add a filter to the existing context instead of replacing it |
 
 ### ⚠️ Gotchas: the traps
 
